@@ -3,8 +3,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  appendEvent,
   appendBuyerEvent,
   createDemoJob,
+  demoBrokenAuthSource,
+  demoPatchedAuthSource,
   issueAgentCaptcha,
   issuePaymentOffer,
   prepareOffers,
@@ -14,7 +17,7 @@ import {
   validateAgentCaptchaSolution,
   validatePaymentProof
 } from "./core.mjs";
-import { verifyPatchWithRunner } from "./verifier.mjs";
+import { applyUnifiedPatch, verifyPatchWithRunner } from "./verifier.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -40,8 +43,9 @@ async function handleRequest(req, res) {
     }
 
     if (url.pathname === "/v1/jobs/reset" && req.method === "POST") {
+      await restoreWorkspaceFixture();
       currentJob = createDemoJob();
-      return json(res, 200, { job: publicJob(currentJob) });
+      return json(res, 200, { job: publicJob(currentJob), workspace: { state: "baseline" } });
     }
 
     if (url.pathname === "/v1/jobs/fix" && req.method === "POST") {
@@ -130,6 +134,11 @@ async function handleRequest(req, res) {
         return json(res, 200, { proof, job: publicJob(currentJob) });
       }
 
+      if (action === "apply" && req.method === "POST") {
+        const workspace = await applyPatchToWorkspace(currentJob);
+        return json(res, 200, { workspace, job: publicJob(currentJob) });
+      }
+
       if (action === "events" && req.method === "GET") {
         const cursor = Number(url.searchParams.get("cursor") || 0);
         const events = currentJob.events.slice(cursor);
@@ -170,6 +179,54 @@ async function handleRequest(req, res) {
       }
     });
   }
+}
+
+async function restoreWorkspaceFixture() {
+  await fs.writeFile(workspaceFixtureFile(), demoBrokenAuthSource, "utf8");
+}
+
+async function applyPatchToWorkspace(job) {
+  if (!job.patchSubmission || !job.verificationProof || job.state !== "released") {
+    throw new Error("Workspace apply requires a released verified patch.");
+  }
+
+  const fixtureFile = workspaceFixtureFile();
+  const currentSource = await fs.readFile(fixtureFile, "utf8");
+  if (currentSource === demoPatchedAuthSource) {
+    return {
+      state: "already_applied",
+      path: "fixtures/red-ci/src/auth.mjs"
+    };
+  }
+
+  if (currentSource !== demoBrokenAuthSource) {
+    throw new Error("Workspace fixture is not at the expected red baseline.");
+  }
+
+  await applyUnifiedPatch(workspaceFixtureDir(), job.patchSubmission.patch, job.fixture.allowedPatchPaths);
+  appendEvent(job, {
+    type: "workspace.applied",
+    title: "Patch applied to workspace",
+    detail: "fixtures/red-ci/src/auth.mjs now matches the purchased patch for git diff review.",
+    panel: "proof",
+    data: {
+      path: "fixtures/red-ci/src/auth.mjs",
+      patchHash: job.patchSubmission.patchHash
+    }
+  });
+
+  return {
+    state: "applied",
+    path: "fixtures/red-ci/src/auth.mjs"
+  };
+}
+
+function workspaceFixtureDir() {
+  return path.join(rootDir, "fixtures", "red-ci");
+}
+
+function workspaceFixtureFile() {
+  return path.join(workspaceFixtureDir(), "src", "auth.mjs");
 }
 
 function prepareOffersForRead() {

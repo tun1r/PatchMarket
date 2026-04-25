@@ -16,6 +16,8 @@ const heroMode = document.querySelector("#hero-mode");
 const heroRelease = document.querySelector("#hero-release");
 const heroAgent = document.querySelector("#hero-agent");
 const proofMetrics = document.querySelector("#proof-metrics");
+const applyBtn = document.querySelector("#apply-btn");
+const applyStatus = document.querySelector("#apply-status");
 const runBtn = document.querySelector("#run-btn");
 const stepBtn = document.querySelector("#step-btn");
 const resetBtn = document.querySelector("#reset-btn");
@@ -38,6 +40,7 @@ let recommendedOffer = null;
 let currentStep = 0;
 let running = false;
 let activeArtifact = "diff";
+let workspaceStatus = "Patch not applied to workspace.";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -54,6 +57,7 @@ const steps = [
 runBtn.addEventListener("click", runProtocol);
 stepBtn.addEventListener("click", stepProtocol);
 resetBtn.addEventListener("click", resetDemo);
+applyBtn.addEventListener("click", applyWorkspacePatch);
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -79,6 +83,7 @@ async function resetDemo() {
   agentCaptcha = null;
   claimCredential = null;
   recommendedOffer = job.recommendedOffer || null;
+  workspaceStatus = "Fixture reset to red baseline.";
   setButtons(false);
   clearProto();
   render();
@@ -219,6 +224,7 @@ function render() {
   renderEvents();
   renderScores();
   renderProofMetrics();
+  renderProofActions();
   renderArtifact();
 }
 
@@ -412,6 +418,35 @@ function renderProofMetrics() {
       <strong>${escapeHtml(releaseAmount)}</strong>
     </div>
   `;
+}
+
+function renderProofActions() {
+  if (!job) {
+    applyBtn.disabled = true;
+    applyStatus.textContent = "Patch not applied to workspace.";
+    return;
+  }
+
+  const appliedEvent = job.events?.find((event) => event.type === "workspace.applied");
+  if (appliedEvent) {
+    workspaceStatus = "Workspace patch applied. Open the fixture in VS Code to review the git diff.";
+  }
+
+  applyBtn.disabled = job.state !== "released";
+  applyStatus.textContent = workspaceStatus;
+}
+
+async function applyWorkspacePatch() {
+  if (!job || job.state !== "released") return;
+  applyBtn.disabled = true;
+  applyStatus.textContent = "Applying patch to fixtures/red-ci/src/auth.mjs...";
+  const response = await fetchJson(`/v1/jobs/${job.id}/apply`, { method: "POST" });
+  job = response.job;
+  workspaceStatus =
+    response.workspace?.state === "already_applied"
+      ? "Workspace already matches the purchased patch."
+      : "Workspace patch applied. Open the fixture in VS Code to review the git diff.";
+  render();
 }
 
 async function solveAgentCaptcha(challenge) {

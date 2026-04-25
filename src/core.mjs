@@ -45,6 +45,30 @@ index 22c2b89..9c3fe02 100644
  }
 `;
 
+export const demoBrokenAuthSource = `export function isTokenExpired(expiresAt, now = Date.now()) {
+  return expiresAt < now - 30000;
+}
+
+export function validateToken(token, now = Date.now()) {
+  if (!token || typeof token.expiresAt !== "number") {
+    return false;
+  }
+  return !isTokenExpired(token.expiresAt, now);
+}
+`;
+
+export const demoPatchedAuthSource = `export function isTokenExpired(expiresAt, now = Date.now()) {
+  return expiresAt <= now;
+}
+
+export function validateToken(token, now = Date.now()) {
+  if (!token || typeof token.expiresAt !== "number") {
+    return false;
+  }
+  return !isTokenExpired(token.expiresAt, now);
+}
+`;
+
 export const demoWorkers = [
   {
     id: "patchlite",

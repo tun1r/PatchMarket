@@ -41,6 +41,7 @@ The UI now has two roles:
 
 1. It can still replay the deterministic fallback path with `Run Replay`.
 2. It can also watch the live buyer flow by polling the current server job and showing buyer reasoning events, offer selection, payment steps, and verifier proof as they happen.
+3. After escrow release, `Apply To Workspace` writes the purchased patch into `fixtures/red-ci/src/auth.mjs` so you can show the real git diff in VS Code. `Reset` restores the red baseline.
 
 The protocol is:
 
@@ -84,6 +85,7 @@ POST /v1/jobs/:id/claim       # accepts Authorization: L402 proof=..., returns a
 POST /v1/jobs/:id/captcha     # accepts CAPTCHA answer + HMAC, returns claim credential
 POST /v1/jobs/:id/patch
 POST /v1/jobs/:id/verify
+POST /v1/jobs/:id/apply
 POST /v1/jobs/:id/buyer-events
 GET  /v1/jobs/:id
 GET  /v1/jobs/:id/events

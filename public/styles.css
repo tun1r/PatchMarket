@@ -438,6 +438,20 @@ h2 {
   padding: 14px;
 }
 
+.proof-actions {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.proof-status {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .metric-card {
   border-radius: 10px;
   min-height: 78px;
@@ -566,6 +580,11 @@ tr.selected {
   .hero-strip,
   .proof-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .proof-actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .hero-payment strong,
