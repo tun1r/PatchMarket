@@ -22,6 +22,8 @@ npm run buyer -- --mode auto --json
 
 `--mode auto` uses OpenAI when `OPENAI_API_KEY` is set and falls back to a local scripted buyer otherwise. Use `--mode scripted` if you want the deterministic stage-safe path explicitly.
 
+The buyer also looks for `OPENAI_API_KEY` in local `.env` or `.env.local` files. It accepts both `OPENAI_API_KEY=value` and `OPENAI_API_KEY: "value"` formats.
+
 The demo has no runtime dependencies and defaults to simulated payment mode so the judged path is deterministic. A real Lightning payment can be added behind the same proof boundary without changing the agent flow.
 
 The verifier path is live: it copies the fixture into a temporary worktree, runs the pinned test command, applies the submitted patch, reruns the same command, and signs the captured before/after logs.

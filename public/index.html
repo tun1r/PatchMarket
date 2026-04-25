@@ -40,6 +40,29 @@
         </div>
       </section>
 
+      <section class="hero-strip" aria-label="Protocol summary">
+        <div class="hero-card hero-danger">
+          <span class="label">Starting State</span>
+          <strong id="hero-red">Red CI</strong>
+          <p id="hero-command">node --test --test-reporter=tap tests/auth.test.mjs</p>
+        </div>
+        <div class="hero-card hero-payment">
+          <span class="label">Money Moment</span>
+          <strong id="hero-402">402 Payment Required</strong>
+          <p id="hero-l402">WWW-Authenticate: pending</p>
+        </div>
+        <div class="hero-card hero-proof">
+          <span class="label">Verifier</span>
+          <strong id="hero-exit">exit --</strong>
+          <p id="hero-mode">executionMode: waiting</p>
+        </div>
+        <div class="hero-card hero-release">
+          <span class="label">Release</span>
+          <strong id="hero-release">0 sats</strong>
+          <p id="hero-agent">awaiting buyer</p>
+        </div>
+      </section>
+
       <section class="grid" aria-label="PatchMarket protocol trace">
         <article class="panel" aria-labelledby="buyer-heading">
           <div class="panel-head">
@@ -71,6 +94,7 @@
             <span class="eyebrow">Patch + Proof</span>
             <h2 id="proof-heading">Verified Outcome</h2>
           </div>
+          <div id="proof-metrics" class="proof-metrics"></div>
           <div id="proof-events" class="event-list"></div>
           <div class="tabs" aria-label="Proof views">
             <button class="tab active" type="button" data-tab="diff">Diff</button>

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { solveAgentCaptchaChallenge } from "./core.mjs";
@@ -17,13 +18,14 @@ export async function runBuyer({
   rootDir = defaultRootDir,
   log = console.log
 } = {}) {
+  const resolvedApiKey = apiKey || (await readLocalSecret(rootDir, "OPENAI_API_KEY"));
   const runtime = {
     baseUrl: baseUrl.replace(/\/$/, ""),
     model,
-    apiKey,
+    apiKey: resolvedApiKey,
     rootDir,
     log,
-    mode: resolveBuyerMode(mode, apiKey),
+    mode: resolveBuyerMode(mode, resolvedApiKey),
     ciResult: null,
     job: null,
     paymentOffer: null,
@@ -51,6 +53,27 @@ export async function runBuyer({
 function resolveBuyerMode(mode, apiKey) {
   if (mode === "openai" || mode === "scripted") return mode;
   return apiKey ? "openai" : "scripted";
+}
+
+async function readLocalSecret(rootDir, key) {
+  for (const candidate of [".env", ".env.local"]) {
+    const filePath = path.join(rootDir, candidate);
+    let raw;
+    try {
+      raw = await fs.readFile(filePath, "utf8");
+    } catch {
+      continue;
+    }
+
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const match = trimmed.match(new RegExp(`^${key}\\s*(?:=|:)\\s*(.+)$`));
+      if (!match) continue;
+      return match[1].trim().replace(/^['"]|['"]$/g, "");
+    }
+  }
+  return "";
 }
 
 async function runScriptedBuyer(runtime) {
@@ -114,15 +137,70 @@ async function runOpenAiBuyer(runtime) {
     const calls = (response.output || []).filter((item) => item.type === "function_call");
     if (!calls.length) {
       if (runtime.job?.state !== "released") {
-        throw new Error("OpenAI buyer stopped before escrow release.");
+        response = await openAiResponseCreate(runtime, {
+          model: runtime.model,
+          instructions,
+          previous_response_id: response.id,
+          input: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text: `Continue the PatchMarket job. Current state: ${runtime.job?.state || "unknown"}. Use the next tool needed to reach released.`
+                }
+              ]
+            }
+          ],
+          tools,
+          tool_choice: "required",
+          parallel_tool_calls: false,
+          max_output_tokens: 500
+        });
+        continue;
       }
       return finalSummary(runtime, extractResponseText(response) || "OpenAI buyer completed the escrow flow.");
     }
 
     const toolOutputs = [];
+    let shouldRetry = false;
     for (const call of calls) {
-      const args = parseArgs(call.arguments);
-      const result = await executeBuyerTool(runtime, call.name, args);
+      let args;
+      try {
+        args = parseArgs(call.arguments);
+      } catch (error) {
+        response = await openAiResponseCreate(runtime, {
+          model: runtime.model,
+          instructions,
+          previous_response_id: response.id,
+          input: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text: `The previous tool call for ${call.name} had invalid JSON arguments (${error.message}). Reissue that tool call with a valid JSON object.`
+                }
+              ]
+            }
+          ],
+          tools,
+          tool_choice: "required",
+          parallel_tool_calls: false,
+          max_output_tokens: 500
+        });
+        shouldRetry = true;
+        break;
+      }
+      let result;
+      try {
+        result = await executeBuyerTool(runtime, call.name, args);
+      } catch (error) {
+        result = {
+          ok: false,
+          error: error.message
+        };
+      }
       toolOutputs.push({
         type: "function_call_output",
         call_id: call.call_id,
@@ -130,13 +208,15 @@ async function runOpenAiBuyer(runtime) {
       });
     }
 
+    if (shouldRetry) continue;
+
     response = await openAiResponseCreate(runtime, {
       model: runtime.model,
       instructions,
       previous_response_id: response.id,
       input: toolOutputs,
       tools,
-      tool_choice: "auto",
+      tool_choice: runtime.job?.state === "released" ? "auto" : "required",
       parallel_tool_calls: false,
       max_output_tokens: 500
     });
@@ -155,7 +235,7 @@ function buildOpenAiTools() {
       title: { type: "string" },
       detail: { type: "string" },
       type: { type: "string" }
-    }, ["title", "detail"]),
+    }, ["title", "detail", "type"]),
     functionTool("list_worker_offers", "Read the currently scored worker offers for the active job.", {}),
     functionTool("select_worker_offer", "Choose one worker offer for the active job.", {
       worker_id: { type: "string" },
@@ -212,38 +292,46 @@ async function executeBuyerTool(runtime, name, args) {
   }
 
   if (name === "list_worker_offers") {
+    ensureActiveJob(runtime, name);
     const offers = await fetchJson(runtime, `/v1/jobs/${runtime.job.id}/offers`);
     runtime.job = offers.job || runtime.job;
     return offers;
   }
 
   if (name === "select_worker_offer") {
+    ensureActiveJob(runtime, name);
     const selected = await selectWorker(runtime, args.worker_id, { rationale: args.rationale });
     return { selected };
   }
 
   if (name === "request_claim_challenge") {
+    ensureActiveJob(runtime, name);
     const claim402 = await requestClaim(runtime);
     return claim402;
   }
 
   if (name === "submit_l402_proof") {
+    ensureActiveJob(runtime, name);
     return submitL402Proof(runtime);
   }
 
   if (name === "solve_agent_captcha") {
+    ensureActiveJob(runtime, name);
     return solveCaptcha(runtime);
   }
 
   if (name === "request_patch") {
+    ensureActiveJob(runtime, name);
     return requestPatch(runtime);
   }
 
   if (name === "verify_patch") {
+    ensureActiveJob(runtime, name);
     return verifyPatch(runtime);
   }
 
   if (name === "get_job_state") {
+    ensureActiveJob(runtime, name);
     return fetchJson(runtime, `/v1/jobs/${runtime.job.id}`);
   }
 
@@ -410,6 +498,12 @@ function extractResponseText(response) {
 function parseArgs(value) {
   if (!value) return {};
   return typeof value === "string" ? JSON.parse(value) : value;
+}
+
+function ensureActiveJob(runtime, toolName) {
+  if (!runtime.job?.id) {
+    throw new Error(`${toolName} requires an active PatchMarket job. Create the job first.`);
+  }
 }
 
 async function inspectRedCi(runtime) {

@@ -315,7 +315,8 @@ export function issuePaymentOffer(job) {
       invoiceHash,
       memo: `PatchMarket claim for ${job.id}`,
       paymentMode: PAYMENT_MODE,
-      simulatedProof: simulatedProof({ nonce, invoiceHash })
+      simulatedProof: simulatedProof({ nonce, invoiceHash }),
+      wwwAuthenticate: `L402 invoiceHash="${invoiceHash}", amountSats="${job.selectedOffer.priceSats}"`
     };
 
     job.paymentOffer = offer;

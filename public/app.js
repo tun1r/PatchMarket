@@ -6,6 +6,15 @@ const artifactView = document.querySelector("#artifact-view");
 const stateChip = document.querySelector("#state-chip");
 const amountChip = document.querySelector("#amount-chip");
 const modeChip = document.querySelector("#mode-chip");
+const heroRed = document.querySelector("#hero-red");
+const heroCommand = document.querySelector("#hero-command");
+const hero402 = document.querySelector("#hero-402");
+const heroL402 = document.querySelector("#hero-l402");
+const heroExit = document.querySelector("#hero-exit");
+const heroMode = document.querySelector("#hero-mode");
+const heroRelease = document.querySelector("#hero-release");
+const heroAgent = document.querySelector("#hero-agent");
+const proofMetrics = document.querySelector("#proof-metrics");
 const runBtn = document.querySelector("#run-btn");
 const stepBtn = document.querySelector("#step-btn");
 const resetBtn = document.querySelector("#reset-btn");
@@ -205,8 +214,10 @@ async function syncCurrentJob() {
 
 function render() {
   renderStatus();
+  renderHero();
   renderEvents();
   renderScores();
+  renderProofMetrics();
   renderArtifact();
 }
 
@@ -222,6 +233,31 @@ function renderStatus() {
   stateChip.className = `chip ${job.state === "released" ? "chip-green" : job.state === "posted" ? "chip-red" : "chip-waiting"}`;
   amountChip.textContent = job.selectedOffer ? `${job.selectedOffer.priceSats} sats` : "0 sats";
   modeChip.textContent = job.selectedOffer ? `${job.selectedOffer.name} selected` : "awaiting buyer";
+}
+
+function renderHero() {
+  if (!job) {
+    heroRed.textContent = "Red CI";
+    heroCommand.textContent = "waiting for fixture";
+    hero402.textContent = "402 Payment Required";
+    heroL402.textContent = "WWW-Authenticate: pending";
+    heroExit.textContent = "exit --";
+    heroMode.textContent = "executionMode: waiting";
+    heroRelease.textContent = "0 sats";
+    heroAgent.textContent = "awaiting buyer";
+    return;
+  }
+
+  const proof = job.verificationProof;
+  const authHeader = job.paymentOffer?.wwwAuthenticate || "pending";
+  heroRed.textContent = job.state === "released" ? "Red CI -> Green" : "Red CI";
+  heroCommand.textContent = job.fixture.acceptanceCommand;
+  hero402.textContent = job.paymentOffer ? "402 Cleared" : "402 Payment Required";
+  heroL402.textContent = `WWW-Authenticate: ${authHeader}`;
+  heroExit.textContent = proof ? `exit ${proof.exitCodeBefore} -> ${proof.exitCodeAfter}` : "exit 1 -> ?";
+  heroMode.textContent = proof ? `executionMode: ${proof.executionMode}` : "executionMode: waiting";
+  heroRelease.textContent = job.reputationEvent ? `${job.reputationEvent.deltaEarnedSats} sats` : "0 sats";
+  heroAgent.textContent = job.selectedOffer ? `${job.selectedOffer.name} ${job.state === "released" ? "paid" : "selected"}` : "awaiting buyer";
 }
 
 function renderEvents() {
@@ -333,6 +369,41 @@ function renderArtifact() {
   }[activeArtifact];
 
   artifactView.innerHTML = activeArtifact === "diff" ? renderDiff(content) : escapeHtml(content);
+}
+
+function renderProofMetrics() {
+  if (!job) {
+    proofMetrics.innerHTML = "";
+    return;
+  }
+
+  const proof = job.verificationProof;
+  const paymentOfferData = job.paymentOffer;
+  const captchaSolved = job.agentCaptcha?.solved ? "solved" : "pending";
+  const releaseAmount = job.reputationEvent?.deltaEarnedSats ? `${job.reputationEvent.deltaEarnedSats} sats` : "pending";
+
+  proofMetrics.innerHTML = `
+    <div class="metric-card">
+      <span class="label">WWW-Authenticate</span>
+      <strong>${escapeHtml(paymentOfferData?.wwwAuthenticate || "pending")}</strong>
+    </div>
+    <div class="metric-card">
+      <span class="label">Agent CAPTCHA</span>
+      <strong>${escapeHtml(captchaSolved)}</strong>
+    </div>
+    <div class="metric-card">
+      <span class="label">Verifier Mode</span>
+      <strong>${escapeHtml(proof?.executionMode || "waiting")}</strong>
+    </div>
+    <div class="metric-card">
+      <span class="label">Exit Codes</span>
+      <strong>${escapeHtml(proof ? `${proof.exitCodeBefore} -> ${proof.exitCodeAfter}` : "1 -> ?")}</strong>
+    </div>
+    <div class="metric-card metric-card-amount">
+      <span class="label">Escrow Release</span>
+      <strong>${escapeHtml(releaseAmount)}</strong>
+    </div>
+  `;
 }
 
 async function solveAgentCaptcha(challenge) {
