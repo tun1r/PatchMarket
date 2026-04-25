@@ -5,6 +5,7 @@ const workerScore = document.querySelector("#worker-score");
 const artifactView = document.querySelector("#artifact-view");
 const stateChip = document.querySelector("#state-chip");
 const amountChip = document.querySelector("#amount-chip");
+const modeChip = document.querySelector("#mode-chip");
 const runBtn = document.querySelector("#run-btn");
 const stepBtn = document.querySelector("#step-btn");
 const resetBtn = document.querySelector("#reset-btn");
@@ -23,6 +24,7 @@ let job = null;
 let paymentOffer = null;
 let agentCaptcha = null;
 let claimCredential = null;
+let recommendedOffer = null;
 let currentStep = 0;
 let running = false;
 let activeArtifact = "diff";
@@ -31,6 +33,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const steps = [
   createJob,
+  selectRecommendedOffer,
   requestClaim,
   retryClaimWithProof,
   solveAgentCaptchaStep,
@@ -50,15 +53,22 @@ tabs.forEach((tab) => {
   });
 });
 
-resetDemo();
+setButtons(false);
+render();
+await syncCurrentJob();
+setInterval(() => {
+  syncCurrentJob().catch(console.error);
+}, 1000);
 
 async function resetDemo() {
   running = false;
   currentStep = 0;
-  job = null;
+  const response = await fetchJson("/v1/jobs/reset", { method: "POST" });
+  job = response.job;
   paymentOffer = null;
   agentCaptcha = null;
   claimCredential = null;
+  recommendedOffer = job.recommendedOffer || null;
   setButtons(false);
   clearProto();
   render();
@@ -93,6 +103,21 @@ async function stepProtocol() {
 
 async function createJob() {
   const response = await fetchJson("/v1/jobs/fix", { method: "POST" });
+  job = response.job;
+  recommendedOffer = response.recommended;
+  render();
+}
+
+async function selectRecommendedOffer() {
+  const selected = recommendedOffer || job.recommendedOffer;
+  const response = await fetchJson(`/v1/jobs/${job.id}/select`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      workerId: selected.workerId,
+      rationale: `Manual replay selected ${selected.name} because it is the recommended verified worker.`
+    })
+  });
   job = response.job;
   render();
 }
@@ -168,6 +193,16 @@ async function fetchJson(url, options = {}) {
   return body;
 }
 
+async function syncCurrentJob() {
+  const response = await fetchJson("/v1/jobs/current");
+  if (!response.job) return;
+  if (!job || response.job.id !== job.id || response.job.events.length !== job.events.length || response.job.state !== job.state) {
+    job = response.job;
+    recommendedOffer = response.job.recommendedOffer || recommendedOffer;
+    render();
+  }
+}
+
 function render() {
   renderStatus();
   renderEvents();
@@ -186,6 +221,7 @@ function renderStatus() {
   stateChip.textContent = job.state;
   stateChip.className = `chip ${job.state === "released" ? "chip-green" : job.state === "posted" ? "chip-red" : "chip-waiting"}`;
   amountChip.textContent = job.selectedOffer ? `${job.selectedOffer.priceSats} sats` : "0 sats";
+  modeChip.textContent = job.selectedOffer ? `${job.selectedOffer.name} selected` : "awaiting buyer";
 }
 
 function renderEvents() {
@@ -244,6 +280,8 @@ function renderScores() {
     return;
   }
 
+  const selectedWorkerId = job.selectedOffer?.workerId || scoring.selected?.workerId || null;
+
   workerScore.innerHTML = `
     <span class="eyebrow">Worker scoring</span>
     <table>
@@ -260,7 +298,7 @@ function renderScores() {
         ${scoring.offers
           .map(
             (offer) => `
-              <tr class="${offer.workerId === scoring.selected.workerId ? "selected" : ""}">
+              <tr class="${offer.workerId === selectedWorkerId ? "selected" : ""}">
                 <td>${offer.name}</td>
                 <td>${offer.model}</td>
                 <td>${offer.priceSats}</td>
@@ -383,6 +421,7 @@ function clearProto() {
 }
 
 function setButtons(isBusy) {
+  runBtn.textContent = currentStep >= steps.length ? "Replay" : "Run Replay";
   runBtn.disabled = isBusy;
   stepBtn.disabled = isBusy && running;
 }

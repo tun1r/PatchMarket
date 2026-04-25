@@ -14,6 +14,7 @@ if (command === "demo" || command === "start") {
   console.log("Fixture: red-ci");
   console.log("Payment mode: simulated");
   console.log("Replay: 402 -> L402 proof -> agent CAPTCHA -> patch -> verify -> release");
+  console.log("Live buyer: npm run buyer -- --mode auto --json");
   console.log("");
   console.log("Try:");
   console.log(`  curl -s -X POST http://localhost:${actualPort}/v1/jobs/fix | jq`);

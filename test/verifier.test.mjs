@@ -5,6 +5,7 @@ import {
   issueAgentCaptcha,
   issuePaymentOffer,
   prepareOffers,
+  selectOffer,
   solveAgentCaptchaChallenge,
   submitPatch,
   validateAgentCaptchaSolution,
@@ -14,7 +15,8 @@ import { verifyPatchWithRunner } from "../src/verifier.mjs";
 
 test("live verifier runs red test, applies patch, reruns green test", async () => {
   const job = createDemoJob();
-  prepareOffers(job);
+  const { recommended } = prepareOffers(job);
+  selectOffer(job, recommended.workerId);
   const offer = issuePaymentOffer(job);
   const auth = `L402 proof="${offer.simulatedProof}", nonce="${offer.nonce}", invoiceHash="${offer.invoiceHash}"`;
 

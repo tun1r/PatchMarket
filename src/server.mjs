@@ -3,11 +3,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  appendBuyerEvent,
   createDemoJob,
   issueAgentCaptcha,
   issuePaymentOffer,
   prepareOffers,
   publicJob,
+  selectOffer,
   submitPatch,
   validateAgentCaptchaSolution,
   validatePaymentProof
@@ -33,10 +35,19 @@ async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, "http://localhost");
 
+    if (url.pathname === "/v1/jobs/current" && req.method === "GET") {
+      return json(res, 200, { job: publicJob(currentJob) });
+    }
+
+    if (url.pathname === "/v1/jobs/reset" && req.method === "POST") {
+      currentJob = createDemoJob();
+      return json(res, 200, { job: publicJob(currentJob) });
+    }
+
     if (url.pathname === "/v1/jobs/fix" && req.method === "POST") {
       currentJob = createDemoJob();
-      const { offers, selected } = prepareOffers(currentJob);
-      return json(res, 201, { job: publicJob(currentJob), offers, selected });
+      const { offers, recommended } = prepareOffers(currentJob);
+      return json(res, 201, { job: publicJob(currentJob), offers, recommended });
     }
 
     const jobMatch = url.pathname.match(/^\/v1\/jobs\/([^/]+)(?:\/([^/]+))?$/);
@@ -59,10 +70,25 @@ async function handleRequest(req, res) {
       }
 
       if (action === "offers" && req.method === "GET") {
-        const { offers, selected } = currentJob.selectedOffer
-          ? { offers: prepareOffersForRead(), selected: currentJob.selectedOffer }
-          : prepareOffers(currentJob);
-        return json(res, 200, { offers, selected });
+        const { offers, recommended } = prepareOffers(currentJob);
+        return json(res, 200, { offers, recommended, selected: currentJob.selectedOffer });
+      }
+
+      if (action === "select" && req.method === "POST") {
+        const body = await readJson(req);
+        const selected = selectOffer(currentJob, body.workerId, {
+          actor: body.actor || "buyer-agent",
+          rationale: body.rationale || null
+        });
+        return json(res, 200, { selected, job: publicJob(currentJob) });
+      }
+
+      if (action === "buyer-events" && req.method === "POST") {
+        const body = await readJson(req);
+        const rawEvents = Array.isArray(body.events) ? body.events : [body];
+        const events = rawEvents.filter((event) => event && (event.title || event.detail || event.type));
+        events.forEach((event) => appendBuyerEvent(currentJob, event));
+        return json(res, 200, { appended: events.length, job: publicJob(currentJob) });
       }
 
       if (action === "claim" && req.method === "POST") {
@@ -147,7 +173,7 @@ async function handleRequest(req, res) {
 }
 
 function prepareOffersForRead() {
-  return currentJob.events.find((event) => event.type === "worker.scored")?.data.offers || [];
+  return currentJob.marketOffers || currentJob.events.find((event) => event.type === "worker.scored")?.data.offers || [];
 }
 
 async function readJson(req) {

@@ -137,6 +137,7 @@ export function createDemoJob() {
     fixture: demoFixture,
     state: "posted",
     paymentMode: PAYMENT_MODE,
+    marketOffers: null,
     selectedOffer: null,
     paymentOffer: null,
     agentCaptcha: null,
@@ -217,24 +218,75 @@ export function transition(job, toState, reason, actor = "system") {
 }
 
 export function prepareOffers(job) {
+  if (job.marketOffers) {
+    return { offers: job.marketOffers, recommended: job.marketOffers[0], selected: job.selectedOffer };
+  }
+
   const offers = scoreWorkers();
-  const selected = offers[0];
-  job.selectedOffer = selected;
+  const recommended = offers[0];
+  job.marketOffers = offers;
 
   appendEvent(job, {
     type: "worker.scored",
-    title: `${selected.name} selected by policy`,
-    detail: `Adjusted score ${selected.adjustedScore}, expected cost ${selected.expectedCostToGreen} sats.`,
+    title: "Worker market quoted offers",
+    detail: `${recommended.name} leads on expected cost to green at ${recommended.expectedCostToGreen} sats.`,
     panel: "buyer",
-    data: { offers, selected }
+    data: { offers, recommended, selected: job.selectedOffer }
   });
 
-  return { offers, selected };
+  return { offers, recommended, selected: job.selectedOffer };
+}
+
+export function selectOffer(job, workerId, { actor = "buyer-agent", rationale = null } = {}) {
+  const { offers, recommended } = prepareOffers(job);
+  const next = offers.find((offer) => offer.workerId === workerId);
+  if (!next) {
+    throw patchMarketError({
+      code: "worker.not_found",
+      message: "Worker offer not found.",
+      cause: `No scored offer exists for worker ${workerId}.`,
+      fix: "Read the scored offers and select one of the advertised worker ids.",
+      retryable: true
+    });
+  }
+
+  if (job.state !== "posted") {
+    throw patchMarketError({
+      code: "worker.selection_locked",
+      message: "Worker selection is already locked.",
+      cause: `Current state is ${job.state}.`,
+      fix: "Create a fresh job to change the selected worker.",
+      retryable: false
+    });
+  }
+
+  job.selectedOffer = next;
+  appendEvent(job, {
+    type: "worker.selected",
+    title: `${next.name} selected`,
+    detail:
+      rationale ||
+      `${next.name} chosen at ${next.priceSats} sats with ${Math.round(next.passRate * 100)}% pass rate.`,
+    panel: "buyer",
+    data: {
+      selected: next,
+      recommended,
+      offers
+    }
+  });
+
+  return next;
 }
 
 export function issuePaymentOffer(job) {
   if (!job.selectedOffer) {
-    prepareOffers(job);
+    throw patchMarketError({
+      code: "worker.not_selected",
+      message: "Select a worker before claiming.",
+      cause: "The buyer has not chosen a worker offer yet.",
+      fix: "Read /offers and POST /select before requesting the claim.",
+      retryable: true
+    });
   }
 
   if (job.state === "posted") {
@@ -790,6 +842,8 @@ export function publicJob(job) {
     state: job.state,
     paymentMode: job.paymentMode,
     fixture: job.fixture,
+    marketOffers: job.marketOffers,
+    recommendedOffer: job.marketOffers?.[0] || null,
     selectedOffer: job.selectedOffer,
     paymentOffer: job.paymentOffer,
     agentCaptcha: job.agentCaptcha ? publicAgentCaptcha(job.agentCaptcha) : null,
@@ -799,6 +853,18 @@ export function publicJob(job) {
     reputationEvent: job.reputationEvent,
     events: job.events
   };
+}
+
+export function appendBuyerEvent(job, event = {}) {
+  const title = String(event.title || "Buyer update");
+  const detail = String(event.detail || "");
+  return appendEvent(job, {
+    type: event.type || "buyer.reasoning",
+    title,
+    detail,
+    panel: "buyer",
+    data: event.data || {}
+  });
 }
 
 function publicAgentCaptcha(challenge) {

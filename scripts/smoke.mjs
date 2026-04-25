@@ -22,6 +22,10 @@ try {
     budget: 5000
   });
   const jobId = jobResponse.json.job.id;
+  await post(`/v1/jobs/${jobId}/select`, {
+    workerId: jobResponse.json.recommended.workerId,
+    rationale: "Smoke runner selected the recommended verified worker."
+  });
 
   const claim402 = await post(`/v1/jobs/${jobId}/claim`, {});
   const offer = claim402.json.paymentOffer;
