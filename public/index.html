@@ -18,8 +18,8 @@
 
       <div class="run-status" aria-live="polite">
         <span id="state-chip" class="chip chip-waiting">waiting</span>
-        <span id="mode-chip" class="chip">simulated Lightning</span>
-        <span id="amount-chip" class="chip">0 sats</span>
+        <span id="mode-chip" class="chip">simulated L402</span>
+        <span id="amount-chip" class="chip">awaiting buyer</span>
       </div>
     </header>
 
@@ -46,7 +46,7 @@
           <strong id="hero-red">Red CI</strong>
           <p id="hero-command">node --test --test-reporter=tap tests/auth.test.mjs</p>
         </div>
-        <div class="hero-card hero-payment">
+        <div id="hero-payment-card" class="hero-card hero-payment">
           <span class="label">Money Moment</span>
           <strong id="hero-402">402 Payment Required</strong>
           <p id="hero-l402">WWW-Authenticate: pending</p>

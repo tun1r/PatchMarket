@@ -6,6 +6,7 @@ const artifactView = document.querySelector("#artifact-view");
 const stateChip = document.querySelector("#state-chip");
 const amountChip = document.querySelector("#amount-chip");
 const modeChip = document.querySelector("#mode-chip");
+const heroPaymentCard = document.querySelector("#hero-payment-card");
 const heroRed = document.querySelector("#hero-red");
 const heroCommand = document.querySelector("#hero-command");
 const hero402 = document.querySelector("#hero-402");
@@ -225,18 +226,20 @@ function renderStatus() {
   if (!job) {
     stateChip.textContent = "waiting";
     stateChip.className = "chip chip-waiting";
-    amountChip.textContent = "0 sats";
+    modeChip.textContent = "simulated L402";
+    amountChip.textContent = "awaiting buyer";
     return;
   }
 
   stateChip.textContent = job.state;
   stateChip.className = `chip ${job.state === "released" ? "chip-green" : job.state === "posted" ? "chip-red" : "chip-waiting"}`;
-  amountChip.textContent = job.selectedOffer ? `${job.selectedOffer.priceSats} sats` : "0 sats";
-  modeChip.textContent = job.selectedOffer ? `${job.selectedOffer.name} selected` : "awaiting buyer";
+  modeChip.textContent = `${job.paymentMode} L402`;
+  amountChip.textContent = job.selectedOffer ? `${job.selectedOffer.name} selected` : "awaiting buyer";
 }
 
 function renderHero() {
   if (!job) {
+    heroPaymentCard?.classList.remove("is-cleared");
     heroRed.textContent = "Red CI";
     heroCommand.textContent = "waiting for fixture";
     hero402.textContent = "402 Payment Required";
@@ -250,12 +253,15 @@ function renderHero() {
 
   const proof = job.verificationProof;
   const authHeader = job.paymentOffer?.wwwAuthenticate || "pending";
+  const compactHeader = compactAuthHeader(authHeader);
   heroRed.textContent = job.state === "released" ? "Red CI -> Green" : "Red CI";
   heroCommand.textContent = job.fixture.acceptanceCommand;
   hero402.textContent = job.paymentOffer ? "402 Cleared" : "402 Payment Required";
-  heroL402.textContent = `WWW-Authenticate: ${authHeader}`;
+  heroPaymentCard?.classList.toggle("is-cleared", Boolean(job.paymentOffer));
+  heroL402.textContent = `WWW-Authenticate: ${compactHeader}`;
+  heroL402.title = job.paymentOffer?.wwwAuthenticate || "pending";
   heroExit.textContent = proof ? `exit ${proof.exitCodeBefore} -> ${proof.exitCodeAfter}` : "exit 1 -> ?";
-  heroMode.textContent = proof ? `executionMode: ${proof.executionMode}` : "executionMode: waiting";
+  heroMode.textContent = proof ? `executionMode: ${compactExecutionMode(proof.executionMode)}` : "executionMode: waiting";
   heroRelease.textContent = job.reputationEvent ? `${job.reputationEvent.deltaEarnedSats} sats` : "0 sats";
   heroAgent.textContent = job.selectedOffer ? `${job.selectedOffer.name} ${job.state === "released" ? "paid" : "selected"}` : "awaiting buyer";
 }
@@ -381,11 +387,13 @@ function renderProofMetrics() {
   const paymentOfferData = job.paymentOffer;
   const captchaSolved = job.agentCaptcha?.solved ? "solved" : "pending";
   const releaseAmount = job.reputationEvent?.deltaEarnedSats ? `${job.reputationEvent.deltaEarnedSats} sats` : "pending";
+  const authHeader = paymentOfferData?.wwwAuthenticate || "pending";
+  const visibleAuth = paymentOfferData ? `accepted ${compactAuthHeader(authHeader)}` : "pending";
 
   proofMetrics.innerHTML = `
     <div class="metric-card">
       <span class="label">WWW-Authenticate</span>
-      <strong>${escapeHtml(paymentOfferData?.wwwAuthenticate || "pending")}</strong>
+      <strong title="${escapeHtml(authHeader)}">${escapeHtml(visibleAuth)}</strong>
     </div>
     <div class="metric-card">
       <span class="label">Agent CAPTCHA</span>
@@ -393,7 +401,7 @@ function renderProofMetrics() {
     </div>
     <div class="metric-card">
       <span class="label">Verifier Mode</span>
-      <strong>${escapeHtml(proof?.executionMode || "waiting")}</strong>
+      <strong title="${escapeHtml(proof?.executionMode || "waiting")}">${escapeHtml(compactExecutionMode(proof?.executionMode || "waiting"))}</strong>
     </div>
     <div class="metric-card">
       <span class="label">Exit Codes</span>
@@ -503,4 +511,22 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function compactAuthHeader(header) {
+  if (!header || header === "pending") return "pending";
+  const invoiceHash = header.match(/invoiceHash="([^"]+)"/)?.[1] || "";
+  const amountSats = header.match(/amountSats="([^"]+)"/)?.[1] || "";
+  if (!invoiceHash) return header;
+  return `L402 ${compactHash(invoiceHash, 8)}${amountSats ? `, ${amountSats} sats` : ""}`;
+}
+
+function compactHash(value, head = 8, tail = 4) {
+  if (!value || value.length <= head + tail + 1) return value;
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+}
+
+function compactExecutionMode(value) {
+  if (value === "temp-worktree-runner") return "temp-worktree";
+  return value;
 }

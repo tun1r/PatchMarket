@@ -132,7 +132,7 @@ async function runOpenAiBuyer(runtime) {
   });
 
   let guard = 0;
-  while (guard < 20) {
+  while (guard < 40) {
     guard += 1;
     const calls = (response.output || []).filter((item) => item.type === "function_call");
     if (!calls.length) {
@@ -222,7 +222,7 @@ async function runOpenAiBuyer(runtime) {
     });
   }
 
-  throw new Error("OpenAI buyer exceeded tool-call budget.");
+  throw new Error(`OpenAI buyer exceeded tool-call budget at state ${runtime.job?.state || "unknown"}.`);
 }
 
 function buildOpenAiTools() {
@@ -465,14 +465,23 @@ async function fetchJson(runtime, pathname, { method = "GET", headers = {}, body
 }
 
 async function openAiResponseCreate(runtime, body) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${runtime.apiKey}`
-    },
-    body: JSON.stringify(body)
-  });
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${runtime.apiKey}`
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20_000)
+    });
+  } catch (error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") {
+      throw new Error("OpenAI API timed out after 20s.");
+    }
+    throw error;
+  }
 
   const text = await response.text();
   const json = text ? JSON.parse(text) : {};

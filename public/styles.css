@@ -242,6 +242,11 @@ h2 {
   overflow: hidden;
   padding: 16px;
   position: relative;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
 }
 
 .hero-card strong {
@@ -268,6 +273,18 @@ h2 {
     linear-gradient(135deg, rgba(255, 216, 77, 0.12), rgba(255, 181, 46, 0.06)),
     var(--paper);
   border-color: rgba(255, 216, 77, 0.42);
+}
+
+.hero-payment.is-cleared {
+  background:
+    linear-gradient(135deg, rgba(53, 224, 161, 0.16), rgba(94, 215, 255, 0.08)),
+    var(--paper);
+  border-color: rgba(53, 224, 161, 0.4);
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px rgba(53, 224, 161, 0.18),
+    0 0 28px rgba(53, 224, 161, 0.16);
+  transform: translateY(-1px);
 }
 
 .hero-proof {
