@@ -1,0 +1,16 @@
+{
+  "name": "patchmarket",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "L402 escrow protocol demo for verified paid software outcomes.",
+  "bin": {
+    "patchmarket": "./bin/patchmarket.mjs"
+  },
+  "scripts": {
+    "start": "node bin/patchmarket.mjs demo",
+    "demo": "node bin/patchmarket.mjs demo",
+    "smoke": "node scripts/smoke.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

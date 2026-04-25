@@ -1,0 +1,13 @@
+.codex/
+.codex
+.claude/
+.claude
+.agents/
+PATCHMARKET_PLAN.md
+*.pdf
+node_modules/
+.DS_Store
+*.log
+dist/
+coverage/
+.gstack/

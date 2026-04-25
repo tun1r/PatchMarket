@@ -1,0 +1,396 @@
+const buyerEvents = document.querySelector("#buyer-events");
+const paymentEvents = document.querySelector("#payment-events");
+const proofEvents = document.querySelector("#proof-events");
+const workerScore = document.querySelector("#worker-score");
+const artifactView = document.querySelector("#artifact-view");
+const stateChip = document.querySelector("#state-chip");
+const amountChip = document.querySelector("#amount-chip");
+const runBtn = document.querySelector("#run-btn");
+const stepBtn = document.querySelector("#step-btn");
+const resetBtn = document.querySelector("#reset-btn");
+const tabs = document.querySelectorAll(".tab");
+
+const protoMap = {
+  "l402.challenge": "proto-402",
+  "l402.proof_accepted": "proto-proof",
+  "agent_captcha.challenge": "proto-captcha",
+  "agent_captcha.solved": "proto-200",
+  "claim.credential_issued": "proto-200",
+  "payment.released": "proto-release"
+};
+
+let job = null;
+let paymentOffer = null;
+let agentCaptcha = null;
+let claimCredential = null;
+let currentStep = 0;
+let running = false;
+let activeArtifact = "diff";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const steps = [
+  createJob,
+  requestClaim,
+  retryClaimWithProof,
+  solveAgentCaptchaStep,
+  submitPatchStep,
+  verifyPatchStep
+];
+
+runBtn.addEventListener("click", runProtocol);
+stepBtn.addEventListener("click", stepProtocol);
+resetBtn.addEventListener("click", resetDemo);
+
+tabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    activeArtifact = tab.dataset.tab;
+    tabs.forEach((item) => item.classList.toggle("active", item === tab));
+    render();
+  });
+});
+
+resetDemo();
+
+async function resetDemo() {
+  running = false;
+  currentStep = 0;
+  job = null;
+  paymentOffer = null;
+  agentCaptcha = null;
+  claimCredential = null;
+  setButtons(false);
+  clearProto();
+  render();
+}
+
+async function runProtocol() {
+  if (running) return;
+  running = true;
+  setButtons(true);
+  try {
+    while (currentStep < steps.length) {
+      await stepProtocol();
+      await sleep(700);
+    }
+  } finally {
+    running = false;
+    setButtons(false);
+  }
+}
+
+async function stepProtocol() {
+  if (currentStep >= steps.length) return;
+  setButtons(true);
+  try {
+    await steps[currentStep]();
+    currentStep += 1;
+    render();
+  } finally {
+    if (!running) setButtons(false);
+  }
+}
+
+async function createJob() {
+  const response = await fetchJson("/v1/jobs/fix", { method: "POST" });
+  job = response.job;
+  render();
+}
+
+async function requestClaim() {
+  const response = await fetch(`/v1/jobs/${job.id}/claim`, { method: "POST" });
+  const body = await response.json();
+  if (response.status !== 402) {
+    throw new Error("Expected 402 Payment Required");
+  }
+  paymentOffer = body.paymentOffer;
+  job = body.job || (await fetchJson(`/v1/jobs/${job.id}`)).job;
+  markProto("proto-claim", "done");
+  markProto("proto-402", "active");
+  render();
+}
+
+async function retryClaimWithProof() {
+  const auth = `L402 proof="${paymentOffer.simulatedProof}", nonce="${paymentOffer.nonce}", invoiceHash="${paymentOffer.invoiceHash}"`;
+  const response = await fetchJson(`/v1/jobs/${job.id}/claim`, {
+    method: "POST",
+    headers: { Authorization: auth }
+  });
+  agentCaptcha = response.captcha;
+  job = response.job;
+  markProto("proto-402", "done");
+  markProto("proto-proof", "done");
+  markProto("proto-captcha", "active");
+  render();
+}
+
+async function solveAgentCaptchaStep() {
+  const solution = await solveAgentCaptcha(agentCaptcha);
+  const response = await fetchJson(`/v1/jobs/${job.id}/captcha`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(solution)
+  });
+  claimCredential = response.claim;
+  job = response.job;
+  markProto("proto-captcha", "done");
+  markProto("proto-200", "active");
+  render();
+}
+
+async function submitPatchStep() {
+  const response = await fetchJson(`/v1/jobs/${job.id}/patch`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ claimCredential })
+  });
+  job = response.job;
+  markProto("proto-200", "done");
+  render();
+}
+
+async function verifyPatchStep() {
+  const response = await fetchJson(`/v1/jobs/${job.id}/verify`, { method: "POST" });
+  job = response.job;
+  markProto("proto-release", "done");
+  render();
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const body = await response.json();
+  if (!response.ok) {
+    const message = body.error
+      ? `${body.error.code}: ${body.error.message} ${body.error.fix}`
+      : `Request failed with ${response.status}`;
+    throw new Error(message);
+  }
+  return body;
+}
+
+function render() {
+  renderStatus();
+  renderEvents();
+  renderScores();
+  renderArtifact();
+}
+
+function renderStatus() {
+  if (!job) {
+    stateChip.textContent = "waiting";
+    stateChip.className = "chip chip-waiting";
+    amountChip.textContent = "0 sats";
+    return;
+  }
+
+  stateChip.textContent = job.state;
+  stateChip.className = `chip ${job.state === "released" ? "chip-green" : job.state === "posted" ? "chip-red" : "chip-waiting"}`;
+  amountChip.textContent = job.selectedOffer ? `${job.selectedOffer.priceSats} sats` : "0 sats";
+}
+
+function renderEvents() {
+  const empty = `<div class="event"><h3>Ready</h3><p>Run the protocol to start the trace.</p></div>`;
+  buyerEvents.innerHTML = empty;
+  paymentEvents.innerHTML = empty;
+  proofEvents.innerHTML = empty;
+
+  if (!job) return;
+
+  const groups = {
+    buyer: [],
+    payment: [],
+    proof: []
+  };
+
+  job.events.forEach((event) => {
+    const panel = groups[event.panel] ? event.panel : "buyer";
+    groups[panel].push(event);
+  });
+
+  buyerEvents.innerHTML = groups.buyer.map(renderEvent).join("");
+  paymentEvents.innerHTML = groups.payment.map(renderEvent).join("");
+  proofEvents.innerHTML = groups.proof.map(renderEvent).join("");
+
+  Object.keys(protoMap).forEach((type) => {
+    if (job.events.some((event) => event.type === type)) {
+      markProto(protoMap[type], "done");
+    }
+  });
+}
+
+function renderEvent(event) {
+  const time = new Date(event.timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+  return `
+    <div class="event ${event.panel || ""}">
+      <h3>${escapeHtml(event.title)}</h3>
+      <p>${escapeHtml(event.detail)}</p>
+      <time>${time} | ${escapeHtml(event.state || "")}</time>
+    </div>
+  `;
+}
+
+function renderScores() {
+  if (!job?.events) {
+    workerScore.innerHTML = "";
+    return;
+  }
+  const scoring = job.events.find((event) => event.type === "worker.scored")?.data;
+  if (!scoring) {
+    workerScore.innerHTML = "";
+    return;
+  }
+
+  workerScore.innerHTML = `
+    <span class="eyebrow">Worker scoring</span>
+    <table>
+      <thead>
+        <tr>
+          <th>Worker</th>
+          <th>Model</th>
+          <th>Price</th>
+          <th>Pass</th>
+          <th>Expected</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${scoring.offers
+          .map(
+            (offer) => `
+              <tr class="${offer.workerId === scoring.selected.workerId ? "selected" : ""}">
+                <td>${offer.name}</td>
+                <td>${offer.model}</td>
+                <td>${offer.priceSats}</td>
+                <td>${Math.round(offer.passRate * 100)}%</td>
+                <td>${offer.adjustedScore}</td>
+              </tr>
+            `
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderArtifact() {
+  if (!job) {
+    artifactView.textContent = "No artifact yet.\nRun the protocol to buy a verified patch.";
+    return;
+  }
+
+  const patch = job.patchSubmission?.patch || "Patch has not been submitted yet.";
+  const beforeLog = job.events?.find((event) => event.type === "verify.started")?.data?.beforeLog || job.fixture?.beforeLog || "";
+  const afterLog = job.events?.find((event) => event.type === "verify.passed")?.data?.afterLog || job.fixture?.afterLog || "";
+  const proof = job.verificationProof
+    ? JSON.stringify(job.verificationProof, null, 2)
+    : "Verification proof has not been signed yet.";
+
+  const content = {
+    diff: patch,
+    logs: `BEFORE\n${beforeLog}\n\nAFTER\n${afterLog}`,
+    proof
+  }[activeArtifact];
+
+  artifactView.innerHTML = activeArtifact === "diff" ? renderDiff(content) : escapeHtml(content);
+}
+
+async function solveAgentCaptcha(challenge) {
+  const data = decodeBase64(challenge.dataB64);
+  const resolvedOutputs = [];
+  for (const step of challenge.program) {
+    const slice = data.slice(step.start, step.start + step.length);
+    if (step.op === "reverse_xor") {
+      resolvedOutputs.push(Uint8Array.from([...slice].reverse().map((byte) => byte ^ step.key)));
+    } else if (step.op === "sum_mod_repeat") {
+      const sum = [...slice].reduce((total, byte) => (total + byte) % 256, 0);
+      resolvedOutputs.push(new Uint8Array(step.repeat).fill(sum));
+    } else if (step.op === "sha256_truncate") {
+      resolvedOutputs.push((await sha256Bytes(slice)).slice(0, step.bytes));
+    }
+  }
+
+  const answer = await sha256Hex(concatBytes(resolvedOutputs));
+  return {
+    sessionId: challenge.sessionId,
+    token: challenge.token,
+    answer,
+    hmac: await hmacSha256Hex(challenge.nonce, answer)
+  };
+}
+
+function decodeBase64(value) {
+  return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+}
+
+function concatBytes(chunks) {
+  const totalLength = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  });
+  return combined;
+}
+
+async function sha256Bytes(bytes) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+}
+
+async function sha256Hex(bytes) {
+  return bytesToHex(await sha256Bytes(bytes));
+}
+
+async function hmacSha256Hex(key, value) {
+  const encoder = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(value));
+  return bytesToHex(new Uint8Array(signature));
+}
+
+function bytesToHex(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function renderDiff(diff) {
+  return diff
+    .split("\n")
+    .map((line) => {
+      const cls = line.startsWith("+") && !line.startsWith("+++") ? "add" : line.startsWith("-") && !line.startsWith("---") ? "del" : "";
+      return cls ? `<span class="${cls}">${escapeHtml(line)}</span>` : escapeHtml(line);
+    })
+    .join("\n");
+}
+
+function markProto(id, state) {
+  const node = document.querySelector(`#${id}`);
+  if (!node) return;
+  node.classList.remove("active", "done");
+  node.classList.add(state);
+}
+
+function clearProto() {
+  document.querySelectorAll(".proto-step").forEach((node) => node.classList.remove("active", "done"));
+}
+
+function setButtons(isBusy) {
+  runBtn.disabled = isBusy;
+  stepBtn.disabled = isBusy && running;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PatchMarket Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">402</div>
+        <div>
+          <h1>PatchMarket</h1>
+          <p>L402 escrow for verified software outcomes</p>
+        </div>
+      </div>
+
+      <div class="run-status" aria-live="polite">
+        <span id="state-chip" class="chip chip-waiting">waiting</span>
+        <span id="mode-chip" class="chip">simulated Lightning</span>
+        <span id="amount-chip" class="chip">0 sats</span>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="command-strip" aria-label="Demo controls">
+        <div>
+          <span class="label">Fixture</span>
+          <strong>red-ci</strong>
+        </div>
+        <div>
+          <span class="label">Acceptance</span>
+          <code>node --test --test-reporter=tap tests/auth.test.mjs</code>
+        </div>
+        <div class="controls">
+          <button id="reset-btn" type="button">Reset</button>
+          <button id="step-btn" type="button">Step</button>
+          <button id="run-btn" type="button" class="primary">Run Protocol</button>
+        </div>
+      </section>
+
+      <section class="grid" aria-label="PatchMarket protocol trace">
+        <article class="panel" aria-labelledby="buyer-heading">
+          <div class="panel-head">
+            <span class="eyebrow">Buyer Agent</span>
+            <h2 id="buyer-heading">Red CI to Work Order</h2>
+          </div>
+          <div id="buyer-events" class="event-list"></div>
+          <div id="worker-score" class="score-block"></div>
+        </article>
+
+        <article class="panel protocol-panel" aria-labelledby="protocol-heading">
+          <div class="panel-head">
+            <span class="eyebrow">L402 + Escrow</span>
+            <h2 id="protocol-heading">Payment Required</h2>
+          </div>
+          <div class="protocol-rail" aria-label="L402 exchange">
+            <div id="proto-claim" class="proto-step">GET /claim</div>
+            <div id="proto-402" class="proto-step hero">402 Payment Required</div>
+            <div id="proto-proof" class="proto-step">Authorization: L402</div>
+            <div id="proto-captcha" class="proto-step">Agent CAPTCHA</div>
+            <div id="proto-200" class="proto-step">claim credential</div>
+            <div id="proto-release" class="proto-step">sats released</div>
+          </div>
+          <div id="payment-events" class="event-list"></div>
+        </article>
+
+        <article class="panel" aria-labelledby="proof-heading">
+          <div class="panel-head">
+            <span class="eyebrow">Patch + Proof</span>
+            <h2 id="proof-heading">Verified Outcome</h2>
+          </div>
+          <div id="proof-events" class="event-list"></div>
+          <div class="tabs" aria-label="Proof views">
+            <button class="tab active" type="button" data-tab="diff">Diff</button>
+            <button class="tab" type="button" data-tab="logs">Logs</button>
+            <button class="tab" type="button" data-tab="proof">Proof</button>
+          </div>
+          <pre id="artifact-view" class="artifact" tabindex="0"></pre>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
