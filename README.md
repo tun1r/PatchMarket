@@ -9,6 +9,7 @@ The wedge is deliberately narrow: red-to-green CI fixes. A buyer agent packages 
 ```sh
 npm test
 npm run smoke
+npm run smoke:live
 npm run demo
 ```
 
@@ -23,6 +24,8 @@ npm run buyer -- --mode auto --json
 `--mode auto` uses OpenAI when `OPENAI_API_KEY` is set and falls back to a local scripted buyer otherwise. Use `--mode scripted` if you want the deterministic stage-safe path explicitly.
 
 The buyer also looks for `OPENAI_API_KEY` in local `.env` or `.env.local` files. It accepts both `OPENAI_API_KEY=value` and `OPENAI_API_KEY: "value"` formats.
+
+`npm run smoke:live` starts a temporary local server and requires the buyer to finish in `openai` mode. It fails if the run falls back to scripted mode.
 
 The demo has no runtime dependencies and defaults to simulated payment mode so the judged path is deterministic. A real Lightning payment can be added behind the same proof boundary without changing the agent flow.
 
@@ -86,4 +89,4 @@ GET  /v1/jobs/:id
 GET  /v1/jobs/:id/events
 ```
 
-The implementation lives in `src/core.mjs`, `src/verifier.mjs`, `src/server.mjs`, `src/buyer.mjs`, and `public/app.js`.
+The implementation lives in `src/core.mjs`, `src/verifier.mjs`, `src/server.mjs`, `src/buyer.mjs`, and `public/app.js`. A stage runbook lives in `JUDGE_SCRIPT.md`.

@@ -13,6 +13,7 @@
     "demo": "node bin/patchmarket.mjs demo",
     "buyer": "node bin/patchmarket-buyer.mjs",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:live": "node scripts/smoke-live.mjs",
     "test": "node --test test/*.test.mjs"
   }
 }
