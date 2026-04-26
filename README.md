@@ -5,8 +5,8 @@
 
 `HackNation 2026 · Spiral track · Earn in the Agent Economy`
 
-> 🎬 **Demo video** — `TODO: paste submission URL here`
-> 🛠️ **Tech video** — `TODO: paste submission URL here`
+> 🎬 **[Demo video](docs/videos/demo.mp4)** — 60-second UI/UX walkthrough
+> 🛠️ **[Tech video](docs/videos/tech.mp4)** — 90-second architecture explainer
 
 ![PatchMarket spectator UI at the released state, showing the hero strip Red CI → Green / 402 Cleared / exit 1 → 0 / 2,800 sats and three agent lanes](docs/img/hero-released.png)
 
