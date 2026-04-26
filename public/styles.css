@@ -630,9 +630,15 @@ body[data-mode="demo"] .run-status,
 body[data-mode="demo"] .demo-status-row,
 body[data-mode="demo"] .score-block,
 body[data-mode="demo"] .tabs,
-body[data-mode="demo"] .protocol-rail,
-body[data-mode="demo"] .proof-actions {
+body[data-mode="demo"] .protocol-rail {
   display: none !important;
+}
+
+/* Keep proof-actions visible in demo mode so the closing shot can use
+ * the Apply-to-workspace button after all scenes have played. */
+body[data-mode="demo"] .proof-actions {
+  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid var(--line);
 }
 
 body[data-mode="demo"] .topbar {
