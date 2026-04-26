@@ -204,13 +204,22 @@ function finishCurrentScene({ next = true } = {}) {
   const { node } = sceneCurrent;
   sceneCurrent = null;
   node.classList.add("is-leaving");
+
+  // If we're advancing AND another scene is queued, keep the stage black
+  // through the swap — no dashboard flash mid-sequence. The stage only
+  // returns to the dashboard at the very end (queue empty) or on Esc.
+  const hasNext = next && sceneQueue.length > 0;
+
   sceneExitTimer = setTimeout(() => {
     sceneStage.innerHTML = "";
-    sceneStage.classList.remove("is-active");
-    sceneStage.setAttribute("aria-hidden", "true");
-    scenePlaying = false;
-    if (next) {
-      sceneGapTimer = setTimeout(drainSceneQueue, 100);
+    if (hasNext) {
+      // Stage stays is-active so the dashboard never peeks through.
+      scenePlaying = false;
+      drainSceneQueue();
+    } else {
+      sceneStage.classList.remove("is-active");
+      sceneStage.setAttribute("aria-hidden", "true");
+      scenePlaying = false;
     }
   }, 220);
 }
