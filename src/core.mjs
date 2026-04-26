@@ -84,7 +84,7 @@ export const demoWorkers = [
   {
     id: "patchpro",
     name: "PatchPro",
-    model: "GPT-5.5-Codex",
+    model: "Claude Code Opus 4.6",
     harness: "test-runner",
     priceSats: 2800,
     passRate: 0.95,
