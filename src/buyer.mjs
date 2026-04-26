@@ -415,12 +415,31 @@ async function solveCaptcha(runtime) {
 }
 
 async function requestPatch(runtime) {
+  // If a worker daemon is running, wait for it to submit the patch instead
+  // of submitting directly. Worker has its own pid and emits worker.* events
+  // that make the "second agent" visible on stage.
+  const workerDeadline = Date.now() + 8000;
+  while (Date.now() < workerDeadline) {
+    const polled = await fetchJson(runtime, `/v1/jobs/${runtime.job.id}`);
+    runtime.job = polled.job || runtime.job;
+    if (runtime.job.patchSubmission) {
+      return { patch: runtime.job.patchSubmission, job: runtime.job, source: "worker-daemon" };
+    }
+    await delay(250);
+  }
+
+  // Fallback: no worker daemon detected, buyer submits the patch directly so
+  // the buyer-only flow (e.g. tests, npm run smoke) keeps working.
   const response = await fetchJson(runtime, `/v1/jobs/${runtime.job.id}/patch`, {
     method: "POST",
     body: { claimCredential: runtime.claim }
   });
   runtime.job = response.job;
-  return response;
+  return { ...response, source: "buyer-fallback" };
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function verifyPatch(runtime) {

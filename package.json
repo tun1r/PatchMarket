@@ -6,12 +6,15 @@
   "description": "L402 escrow protocol demo for verified paid software outcomes.",
   "bin": {
     "patchmarket": "./bin/patchmarket.mjs",
-    "patchmarket-buyer": "./bin/patchmarket-buyer.mjs"
+    "patchmarket-buyer": "./bin/patchmarket-buyer.mjs",
+    "patchmarket-worker": "./bin/patchmarket-worker.mjs"
   },
   "scripts": {
     "start": "node bin/patchmarket.mjs demo",
     "demo": "node bin/patchmarket.mjs demo",
     "buyer": "node bin/patchmarket-buyer.mjs",
+    "worker": "node bin/patchmarket-worker.mjs",
+    "showtime": "node scripts/showtime.mjs",
     "smoke": "node scripts/smoke.mjs",
     "smoke:live": "node scripts/smoke-live.mjs",
     "test": "node --test test/*.test.mjs"

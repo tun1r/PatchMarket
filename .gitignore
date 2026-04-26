@@ -11,3 +11,7 @@ node_modules/
 dist/
 coverage/
 .gstack/
+assets/recordings/
+assets/submission/
+.env
+.env.local

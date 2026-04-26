@@ -1,4 +1,5 @@
 const buyerEvents = document.querySelector("#buyer-events");
+const workerEvents = document.querySelector("#worker-events");
 const paymentEvents = document.querySelector("#payment-events");
 const proofEvents = document.querySelector("#proof-events");
 const workerScore = document.querySelector("#worker-score");
@@ -7,6 +8,7 @@ const stateChip = document.querySelector("#state-chip");
 const amountChip = document.querySelector("#amount-chip");
 const modeChip = document.querySelector("#mode-chip");
 const heroPaymentCard = document.querySelector("#hero-payment-card");
+const heroReleaseCard = document.querySelector("#hero-release-card");
 const heroRed = document.querySelector("#hero-red");
 const heroCommand = document.querySelector("#hero-command");
 const hero402 = document.querySelector("#hero-402");
@@ -15,6 +17,9 @@ const heroExit = document.querySelector("#hero-exit");
 const heroMode = document.querySelector("#hero-mode");
 const heroRelease = document.querySelector("#hero-release");
 const heroAgent = document.querySelector("#hero-agent");
+const buyerMeta = document.querySelector("#buyer-meta");
+const workerMeta = document.querySelector("#worker-meta");
+const verifierMeta = document.querySelector("#verifier-meta");
 const proofMetrics = document.querySelector("#proof-metrics");
 const applyBtn = document.querySelector("#apply-btn");
 const applyStatus = document.querySelector("#apply-status");
@@ -28,6 +33,12 @@ const runBtn = document.querySelector("#run-btn");
 const stepBtn = document.querySelector("#step-btn");
 const resetBtn = document.querySelector("#reset-btn");
 const tabs = document.querySelectorAll(".tab");
+
+const isSpectator = new URLSearchParams(window.location.search).get("demo") === "1";
+if (isSpectator) {
+  document.body.dataset.mode = "demo";
+}
+const POLL_MS = isSpectator ? 500 : 1000;
 
 const protoMap = {
   "l402.challenge": "proto-402",
@@ -91,7 +102,29 @@ render();
 await syncCurrentJob();
 setInterval(() => {
   Promise.all([syncCurrentJob(), syncRunState()]).catch(console.error);
-}, 1000);
+}, POLL_MS);
+
+if (isSpectator) {
+  setTimeout(() => {
+    autoStartSpectator().catch(console.error);
+  }, 600);
+}
+
+async function autoStartSpectator() {
+  if (runState.status === "running" || job?.state === "released") return;
+  if (job && job.state !== "posted") {
+    await fetchJson("/v1/jobs/reset", { method: "POST" }).catch(() => {});
+  }
+  const response = await fetchJson("/v1/demo/run", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ mode: "openai", model: selectedModel })
+  }).catch((error) => ({ error }));
+  if (response?.run) {
+    runState = response.run;
+    render();
+  }
+}
 
 async function resetDemo() {
   running = false;
@@ -309,6 +342,7 @@ function renderStatus() {
 function renderHero() {
   if (!job) {
     heroPaymentCard?.classList.remove("is-cleared");
+    heroReleaseCard?.classList.remove("is-released");
     heroRed.textContent = "Red CI";
     heroCommand.textContent = "waiting for fixture";
     hero402.textContent = "402 Payment Required";
@@ -317,34 +351,57 @@ function renderHero() {
     heroMode.textContent = "executionMode: waiting";
     heroRelease.textContent = "0 sats";
     heroAgent.textContent = "awaiting buyer";
+    if (buyerMeta) buyerMeta.textContent = `${selectedModel} · awaiting`;
+    if (workerMeta) workerMeta.textContent = "patchpro · offline";
+    if (verifierMeta) verifierMeta.textContent = "temp-worktree · awaiting";
     return;
   }
 
   const proof = job.verificationProof;
   const authHeader = job.paymentOffer?.wwwAuthenticate || "pending";
   const compactHeader = compactAuthHeader(authHeader);
-  heroRed.textContent = job.state === "released" ? "Red CI -> Green" : "Red CI";
+  heroRed.textContent = job.state === "released" ? "Red CI → Green" : "Red CI";
   heroCommand.textContent = job.fixture.acceptanceCommand;
   hero402.textContent = job.paymentOffer ? "402 Cleared" : "402 Payment Required";
   heroPaymentCard?.classList.toggle("is-cleared", Boolean(job.paymentOffer));
   heroL402.textContent = `WWW-Authenticate: ${compactHeader}`;
   heroL402.title = job.paymentOffer?.wwwAuthenticate || "pending";
-  heroExit.textContent = proof ? `exit ${proof.exitCodeBefore} -> ${proof.exitCodeAfter}` : "exit 1 -> ?";
+  heroExit.textContent = proof ? `exit ${proof.exitCodeBefore} → ${proof.exitCodeAfter}` : "exit 1 → ?";
   heroMode.textContent = proof ? `executionMode: ${compactExecutionMode(proof.executionMode)}` : "executionMode: waiting";
-  heroRelease.textContent = job.reputationEvent ? `${job.reputationEvent.deltaEarnedSats} sats` : "0 sats";
+  heroRelease.textContent = job.reputationEvent ? `${job.reputationEvent.deltaEarnedSats.toLocaleString()} sats` : "0 sats";
   heroAgent.textContent = job.selectedOffer ? `${job.selectedOffer.name} ${job.state === "released" ? "paid" : "selected"}` : "awaiting buyer";
+  heroReleaseCard?.classList.toggle("is-released", job.state === "released");
+
+  if (buyerMeta) {
+    const stage = job.state === "released" ? "complete" : job.state === "posted" ? "awaiting" : "active";
+    const model = runState?.summary?.model || runState?.model || selectedModel;
+    buyerMeta.textContent = `${model} · ${stage}`;
+  }
+  if (workerMeta) {
+    const workerName = job.selectedOffer?.workerId || "patchpro";
+    const workerEventTypes = ["worker.online", "worker.claiming", "worker.patching", "worker.submitted", "worker.awaiting_release"];
+    const lastWorkerEvent = job.events?.slice().reverse().find((event) => workerEventTypes.includes(event.type));
+    const stage = lastWorkerEvent?.type?.replace("worker.", "") || (job.selectedOffer ? "selected" : "offline");
+    workerMeta.textContent = `${workerName} · ${stage}`;
+  }
+  if (verifierMeta) {
+    const stage = proof ? `exit ${proof.exitCodeBefore} → ${proof.exitCodeAfter}` : job.state === "verifying" ? "running" : "awaiting";
+    verifierMeta.textContent = `temp-worktree · ${stage}`;
+  }
 }
 
 function renderEvents() {
-  const empty = `<div class="event"><h3>Ready</h3><p>Run the protocol to start the trace.</p></div>`;
+  const empty = `<div class="event"><h3>Awaiting buyer</h3><p>Run the live buyer to start the trace.</p></div>`;
   buyerEvents.innerHTML = empty;
-  paymentEvents.innerHTML = empty;
+  if (workerEvents) workerEvents.innerHTML = empty;
   proofEvents.innerHTML = empty;
+  if (paymentEvents) paymentEvents.innerHTML = "";
 
   if (!job) return;
 
   const groups = {
     buyer: [],
+    worker: [],
     payment: [],
     proof: []
   };
@@ -354,9 +411,17 @@ function renderEvents() {
     groups[panel].push(event);
   });
 
-  buyerEvents.innerHTML = groups.buyer.map(renderEvent).join("");
-  paymentEvents.innerHTML = groups.payment.map(renderEvent).join("");
-  proofEvents.innerHTML = groups.proof.map(renderEvent).join("");
+  // Merge worker + payment into the worker lane (payment events are protocol
+  // moments owned by the claim/escrow flow that the worker participates in).
+  const workerLane = [...groups.worker, ...groups.payment].sort(
+    (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+  );
+
+  buyerEvents.innerHTML = groups.buyer.map(renderEvent).join("") || empty;
+  if (workerEvents) {
+    workerEvents.innerHTML = workerLane.map(renderEvent).join("") || empty;
+  }
+  proofEvents.innerHTML = groups.proof.map(renderEvent).join("") || empty;
 
   Object.keys(protoMap).forEach((type) => {
     if (job.events.some((event) => event.type === type)) {

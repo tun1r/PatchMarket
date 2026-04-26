@@ -3,16 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PatchMarket Demo</title>
+    <title>PatchMarket — Agent-to-agent verified work</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="brand">
-        <div class="mark">402</div>
+        <div class="mark">L402</div>
         <div>
           <h1>PatchMarket</h1>
-          <p>L402 escrow for verified software outcomes</p>
+          <p>Agent-to-agent verified software outcomes</p>
         </div>
       </div>
 
@@ -75,27 +81,29 @@
           <strong id="hero-exit">exit --</strong>
           <p id="hero-mode">executionMode: waiting</p>
         </div>
-        <div class="hero-card hero-release">
+        <div class="hero-card hero-release" id="hero-release-card">
           <span class="label">Release</span>
           <strong id="hero-release">0 sats</strong>
           <p id="hero-agent">awaiting buyer</p>
         </div>
       </section>
 
-      <section class="grid" aria-label="PatchMarket protocol trace">
-        <article class="panel" aria-labelledby="buyer-heading">
-          <div class="panel-head">
+      <section class="grid" aria-label="Three agents transacting">
+        <article class="lane" aria-labelledby="buyer-heading">
+          <div class="lane-head">
             <span class="eyebrow">Buyer Agent</span>
             <h2 id="buyer-heading">Live Buyer Trace</h2>
+            <span class="lane-meta" id="buyer-meta">gpt-5.1-codex-mini · awaiting</span>
           </div>
           <div id="buyer-events" class="event-list"></div>
           <div id="worker-score" class="score-block"></div>
         </article>
 
-        <article class="panel protocol-panel" aria-labelledby="protocol-heading">
-          <div class="panel-head">
-            <span class="eyebrow">L402 + Escrow</span>
-            <h2 id="protocol-heading">Payment Required</h2>
+        <article class="lane protocol-panel" aria-labelledby="worker-heading">
+          <div class="lane-head">
+            <span class="eyebrow">Worker Agent</span>
+            <h2 id="worker-heading">PatchPro</h2>
+            <span class="lane-meta" id="worker-meta">patchpro · offline</span>
           </div>
           <div class="protocol-rail" aria-label="L402 exchange">
             <div id="proto-claim" class="proto-step">GET /claim</div>
@@ -105,13 +113,15 @@
             <div id="proto-200" class="proto-step">claim credential</div>
             <div id="proto-release" class="proto-step">sats released</div>
           </div>
-          <div id="payment-events" class="event-list"></div>
+          <div id="worker-events" class="event-list"></div>
+          <div id="payment-events" class="event-list" hidden></div>
         </article>
 
-        <article class="panel" aria-labelledby="proof-heading">
-          <div class="panel-head">
-            <span class="eyebrow">Patch + Proof</span>
+        <article class="lane" aria-labelledby="proof-heading">
+          <div class="lane-head">
+            <span class="eyebrow">Verifier</span>
             <h2 id="proof-heading">Verified Outcome</h2>
+            <span class="lane-meta" id="verifier-meta">temp-worktree · awaiting</span>
           </div>
           <div id="proof-metrics" class="proof-metrics"></div>
           <div class="proof-actions">

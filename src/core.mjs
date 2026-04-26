@@ -892,6 +892,18 @@ export function appendBuyerEvent(job, event = {}) {
   });
 }
 
+export function appendWorkerEvent(job, event = {}) {
+  const title = String(event.title || "Worker update");
+  const detail = String(event.detail || "");
+  return appendEvent(job, {
+    type: event.type || "worker.update",
+    title,
+    detail,
+    panel: "worker",
+    data: event.data || {}
+  });
+}
+
 function publicAgentCaptcha(challenge) {
   return {
     sessionId: challenge.sessionId,

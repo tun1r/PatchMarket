@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   appendEvent,
   appendBuyerEvent,
+  appendWorkerEvent,
   createDemoJob,
   demoBrokenAuthSource,
   demoPatchedAuthSource,
@@ -145,6 +146,14 @@ async function handleRequest(req, res) {
         const rawEvents = Array.isArray(body.events) ? body.events : [body];
         const events = rawEvents.filter((event) => event && (event.title || event.detail || event.type));
         events.forEach((event) => appendBuyerEvent(currentJob, event));
+        return json(res, 200, { appended: events.length, job: publicJob(currentJob) });
+      }
+
+      if (action === "worker-events" && req.method === "POST") {
+        const body = await readJson(req);
+        const rawEvents = Array.isArray(body.events) ? body.events : [body];
+        const events = rawEvents.filter((event) => event && (event.title || event.detail || event.type));
+        events.forEach((event) => appendWorkerEvent(currentJob, event));
         return json(res, 200, { appended: events.length, job: publicJob(currentJob) });
       }
 
