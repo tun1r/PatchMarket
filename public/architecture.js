@@ -9,6 +9,7 @@ const scenes = [
   { id: "cold", label: "cold open", build: buildCold },
   { id: "system", label: "system map", build: buildSystem },
   { id: "fsm", label: "escrow fsm", build: buildFsm },
+  { id: "captcha", label: "agent captcha", build: buildCaptcha },
   { id: "l402", label: "l402 exchange", build: buildL402 },
   { id: "verifier", label: "verifier subprocess", build: buildVerifier },
   { id: "source", label: "source + ship", build: buildSource }
@@ -87,7 +88,7 @@ function buildCold() {
   return frame(
     "scene-cold",
     `
-    <span class="eyebrow">cold open · 01 of 06</span>
+    <span class="eyebrow">cold open · 01 of 07</span>
     <h2 class="title">PatchMarket runs on three processes.</h2>
     <p class="subtitle">A buyer agent (real OpenAI tool calls), a server (HTTP + L402 + escrow FSM), and a worker daemon (separate PID, polls and patches). The verifier is a real Node subprocess. Run it with one command.</p>
     <div class="term-window">
@@ -110,7 +111,7 @@ function buildSystem() {
   const node = frame(
     "scene-system",
     `
-    <span class="eyebrow">system map · 02 of 06</span>
+    <span class="eyebrow">system map · 02 of 07</span>
     <h2 class="title">Four components, two trust boundaries.</h2>
     <p class="subtitle">Buyer never touches the worker process. Worker never touches the verifier subprocess. Server brokers everything; verifier runs in a temp worktree with the network disabled.</p>
     <div class="system-canvas">
@@ -262,7 +263,7 @@ function buildFsm() {
   return frame(
     "scene-fsm",
     `
-    <span class="eyebrow">escrow finite state machine · 03 of 06</span>
+    <span class="eyebrow">escrow finite state machine · 03 of 07</span>
     <h2 class="title">16 states, every transition signed.</h2>
     <p class="subtitle">From <code style="color:var(--accent)">src/core.mjs</code>. Solid amber path is the happy line. Dashed terracotta paths are the failure branches. Worker only earns from <code style="color:#a8c098">released</code>.</p>
     <div class="fsm-canvas">${svg}</div>
@@ -275,12 +276,120 @@ function buildFsm() {
   );
 }
 
-// ---------- Scene 04 — L402 exchange ----------
+// ---------- Scene 04 — Agent CAPTCHA security ----------
+function buildCaptcha() {
+  const code = `<span class="ln">463</span><span class="kw">const</span> data = crypto.<span class="fn">randomBytes</span>(<span class="num">32</span>);
+<span class="ln">464</span><span class="kw">const</span> nonce = crypto.<span class="fn">randomUUID</span>();
+<span class="ln">465</span><span class="kw">const</span> sessionId = <span class="str">\`captcha_\${</span>...<span class="str">}\`</span>;
+<span class="ln">466</span><span class="kw">const</span> token = <span class="fn">hashText</span>(<span class="str">\`...\`</span>).<span class="fn">slice</span>(<span class="num">0</span>, <span class="num">32</span>);
+<span class="ln">467</span><span class="kw">const</span> program = [
+<span class="row hi"><span class="ln">468</span>  { op: <span class="str">"reverse_xor"</span>,    start: <span class="num">0</span>,  length: <span class="num">16</span>, key: <span class="num">0xa3</span> },
+<span class="ln">469</span>  { op: <span class="str">"sum_mod_repeat"</span>, start: <span class="num">16</span>, length: <span class="num">16</span>, repeat: <span class="num">8</span> },
+<span class="ln">470</span>  { op: <span class="str">"sha256_truncate"</span>, start: <span class="num">0</span>, length: <span class="num">32</span>, bytes: <span class="num">8</span> }</span>
+<span class="ln">471</span>];
+<span class="ln">472</span><span class="kw">const</span> answer = <span class="fn">solveAgentCaptchaProgram</span>(data, program);
+<span class="ln">473</span>
+<span class="ln">474</span>job.agentCaptcha = {
+<span class="ln">475</span>  sessionId, token,
+<span class="ln">476</span>  dataB64: data.<span class="fn">toString</span>(<span class="str">"base64"</span>),
+<span class="ln">477</span>  program, nonce,
+<span class="row hi"><span class="ln">486</span>  expiresAt: <span class="kw">new</span> <span class="fn">Date</span>(<span class="fn">Date</span>.<span class="fn">now</span>() + <span class="num">30</span> * <span class="num">1000</span>).<span class="fn">toISOString</span>(),
+<span class="ln">488</span>  answerHash: <span class="fn">hashText</span>(answer),
+<span class="ln">489</span>  solved: <span class="kw">false</span></span>
+<span class="ln">491</span>};`;
+
+  return frame(
+    "scene-captcha",
+    `
+    <span class="eyebrow">agent captcha · security · 04 of 07</span>
+    <h2 class="title">Inverted CAPTCHA: only an agent can claim.</h2>
+    <p class="subtitle">A reverse Turing gate. 32 random bytes, a 5-step byte transform pipeline, 30-second TTL, HMAC-bound nonce, single-use. Humans can't keep up; static bots can't execute the program. Replay-proof and time-bounded by construction.</p>
+
+    <div class="captcha-grid">
+      <div class="code-pane">
+        <div class="pane-head"><span class="accent">src/core.mjs</span><span>issueAgentCaptcha()</span></div>
+        <pre>${code}</pre>
+      </div>
+      <div class="captcha-rules">
+        <div class="rule">
+          <span class="rule-tag">01</span>
+          <div>
+            <strong>Unpredictable</strong>
+            <p><code>crypto.randomBytes(32)</code> — every challenge is fresh. No precompute attack possible.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="rule-tag">02</span>
+          <div>
+            <strong>Time-bounded</strong>
+            <p><code>expiresAt = +30s</code>. Server checks before validating. Humans can't read, transform, and reply that fast.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="rule-tag">03</span>
+          <div>
+            <strong>Replay-proof</strong>
+            <p><code>solved: false</code> flips on first valid submission. Re-using the same answer rejects with <code>agent_captcha.replayed</code>.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="rule-tag">04</span>
+          <div>
+            <strong>Nonce-bound</strong>
+            <p>Final proof is <code>hmac(nonce, answer)</code>. Server recomputes and compares — answer alone isn't enough.</p>
+          </div>
+        </div>
+        <div class="rule">
+          <span class="rule-tag">05</span>
+          <div>
+            <strong>Server verifies</strong>
+            <p>Server stores <code>answerHash</code> only. Client must produce the answer that matches both the hash <em>and</em> the HMAC.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="captcha-chain">
+      <div class="chain-step">
+        <span class="step-bytes">32 bytes</span>
+        <span class="step-name">random</span>
+        <span class="step-detail">crypto.randomBytes(32)</span>
+      </div>
+      <span class="chain-arrow">→</span>
+      <div class="chain-step">
+        <span class="step-bytes">16 bytes</span>
+        <span class="step-name">reverse_xor</span>
+        <span class="step-detail">slice[0..15] ⊕ 0xA3, reversed</span>
+      </div>
+      <span class="chain-arrow">→</span>
+      <div class="chain-step">
+        <span class="step-bytes">8 bytes</span>
+        <span class="step-name">sum_mod_repeat</span>
+        <span class="step-detail">Σ slice[16..31] % 256, ×8</span>
+      </div>
+      <span class="chain-arrow">→</span>
+      <div class="chain-step">
+        <span class="step-bytes">8 bytes</span>
+        <span class="step-name">sha256_truncate</span>
+        <span class="step-detail">sha256(all 32) → first 8</span>
+      </div>
+      <span class="chain-arrow">→</span>
+      <div class="chain-step is-final">
+        <span class="step-bytes">hex</span>
+        <span class="step-name">hmac(nonce, answer)</span>
+        <span class="step-detail">single-use proof</span>
+      </div>
+    </div>
+    `
+  );
+}
+
+// ---------- Scene 05 — L402 exchange ----------
 function buildL402() {
   return frame(
     "scene-l402",
     `
-    <span class="eyebrow">l402 protocol exchange · 04 of 06</span>
+    <span class="eyebrow">l402 protocol exchange · 05 of 07</span>
     <h2 class="title">A real <code style="color:var(--accent);font-size:0.78em">402 Payment Required</code>.</h2>
     <p class="subtitle">Worker claim is gated by an HTTP 402 with a <code>WWW-Authenticate: L402</code> header. Buyer retries with a matching <code>Authorization: L402</code> proof. No auth, no claim credential. No claim, no patch.</p>
     <div class="exchange">
@@ -391,7 +500,7 @@ function buildVerifier() {
   return frame(
     "scene-verifier",
     `
-    <span class="eyebrow">verifier subprocess · 05 of 06</span>
+    <span class="eyebrow">verifier subprocess · 06 of 07</span>
     <h2 class="title">Real <code style="color:#c08bd6;font-size:0.78em">spawn()</code>. Real exit code. Signed proof.</h2>
     <p class="subtitle">The worker doesn't get paid for handing in a diff. It gets paid for making the pinned acceptance command return exit 0 in a fresh temp worktree. Every release is bound to seven hashes.</p>
     <div class="verify-grid">
@@ -433,7 +542,7 @@ function buildSource() {
   return frame(
     "scene-source",
     `
-    <span class="eyebrow">source + ship · 06 of 06</span>
+    <span class="eyebrow">source + ship · 07 of 07</span>
     <h2 class="title">Runs locally. <code style="color:var(--accent);font-size:0.78em">npm run showtime</code>.</h2>
     <p class="subtitle">Zero runtime dependencies in the protocol path. Node 20+, OpenAI Responses API for the buyer (with scripted fallback), simulated L402, real Node subprocess for verification.</p>
     <div class="source-grid">

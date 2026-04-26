@@ -465,7 +465,148 @@ kbd {
   border: 1px solid var(--green);
 }
 
-/* SCENE 04 — L402 protocol exchange */
+/* SCENE 04 — Agent CAPTCHA security */
+.scene-captcha {
+  gap: 14px;
+  max-width: 1280px;
+}
+
+.captcha-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1.05fr 1fr;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.captcha-rules {
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px;
+  text-align: left;
+}
+
+.captcha-rules .rule {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 14px;
+  padding: 10px 0;
+}
+
+.captcha-rules .rule:last-child {
+  border-bottom: 0;
+}
+
+.captcha-rules .rule-tag {
+  background: rgba(212, 161, 85, 0.1);
+  border: 1px solid rgba(212, 161, 85, 0.3);
+  border-radius: 4px;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+  padding: 3px 7px;
+}
+
+.captcha-rules .rule strong {
+  color: var(--ink-strong);
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+.captcha-rules .rule p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+
+.captcha-rules .rule p code {
+  background: rgba(212, 161, 85, 0.08);
+  border-radius: 3px;
+  color: var(--accent);
+  font-size: 11px;
+  padding: 1px 5px;
+}
+
+.captcha-chain {
+  align-items: stretch;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  display: flex;
+  gap: 0;
+  margin-top: 4px;
+  padding: 16px 14px;
+  width: 100%;
+}
+
+.captcha-chain .chain-step {
+  align-items: flex-start;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 12px;
+  text-align: left;
+}
+
+.captcha-chain .step-bytes {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--ink);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+}
+
+.captcha-chain .step-name {
+  color: var(--ink-strong);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.captcha-chain .step-detail {
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.captcha-chain .chain-step.is-final .step-bytes {
+  background: rgba(212, 161, 85, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.captcha-chain .chain-step.is-final .step-name {
+  color: var(--accent);
+}
+
+.captcha-chain .chain-arrow {
+  align-items: center;
+  color: var(--muted-2);
+  display: flex;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 16px;
+  flex-shrink: 0;
+  padding: 0 6px;
+}
+
+/* SCENE 05 — L402 protocol exchange */
 .scene-l402 {
   gap: 18px;
   max-width: 1100px;
