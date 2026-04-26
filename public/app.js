@@ -50,7 +50,7 @@ let sceneExitTimer = null;
 let sceneGapTimer = null;
 let sceneCurrent = null; // { node, trigger, event }
 let sceneHistory = []; // for replay-previous nav
-let sceneAutoAdvance = true;
+let sceneAutoAdvance = false;
 
 const protoMap = {
   "l402.challenge": "proto-402",
