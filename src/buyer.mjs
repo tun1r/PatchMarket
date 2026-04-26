@@ -7,7 +7,7 @@ import { solveAgentCaptchaChallenge } from "./core.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultRootDir = path.resolve(__dirname, "..");
 const defaultBaseUrl = process.env.PATCHMARKET_BASE_URL || "http://127.0.0.1:3000";
-const defaultModel = process.env.PATCHMARKET_BUYER_MODEL || "gpt-5";
+const defaultModel = process.env.PATCHMARKET_BUYER_MODEL || "gpt-5.1-codex-mini";
 const fixtureCommand = "node --test --test-reporter=tap tests/auth.test.mjs";
 
 export async function runBuyer({

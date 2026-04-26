@@ -33,7 +33,7 @@ function parseArgs(argv) {
   const parsed = {
     baseUrl: process.env.PATCHMARKET_BASE_URL || "http://127.0.0.1:3000",
     mode: "auto",
-    model: process.env.PATCHMARKET_BUYER_MODEL || "gpt-5",
+    model: process.env.PATCHMARKET_BUYER_MODEL || "gpt-5.1-codex-mini",
     json: false,
     quiet: false
   };
