@@ -302,7 +302,7 @@ function buildCaptcha() {
     "scene-captcha",
     `
     <span class="eyebrow">agent-only captcha · claim gate · 04 of 07</span>
-    <h2 class="title">Agent-only CAPTCHA.</h2>
+    <h2 class="title">Agent-only CAPTCHA. NOT for Humans.</h2>
     <p class="subtitle">Server issues 32 random bytes plus a 3-step byte-transform program. Solver runs the program, concats the outputs, SHA-256s the result for the answer, then HMACs the answer with the server nonce. Single-use, time-bounded, replay-proof. A claim gate, not a humanness or honesty proof.</p>
 
     <div class="captcha-grid">
