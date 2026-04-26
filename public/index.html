@@ -33,11 +33,30 @@
           <span class="label">Acceptance</span>
           <code>node --test --test-reporter=tap tests/auth.test.mjs</code>
         </div>
+        <div class="demo-modes" aria-label="Run mode">
+          <div class="mode-group">
+            <span class="label">Mode</span>
+            <div class="segmented">
+              <button id="mode-live-btn" class="segment active" type="button">Live Buyer</button>
+              <button id="mode-replay-btn" class="segment" type="button">Replay</button>
+            </div>
+          </div>
+          <div id="model-group" class="mode-group">
+            <span class="label">Model</span>
+            <div class="segmented">
+              <button id="model-mini-btn" class="segment active" type="button">gpt-5.1-codex-mini</button>
+              <button id="model-gpt5-btn" class="segment" type="button">gpt-5</button>
+            </div>
+          </div>
+        </div>
         <div class="controls">
           <button id="reset-btn" type="button">Reset</button>
           <button id="step-btn" type="button">Step</button>
-          <button id="run-btn" type="button" class="primary">Run Replay</button>
+          <button id="run-btn" type="button" class="primary">Run Live Buyer</button>
         </div>
+      </section>
+      <section class="demo-status-row" aria-live="polite">
+        <span id="demo-status" class="demo-status">Live Buyer ready.</span>
       </section>
 
       <section class="hero-strip" aria-label="Protocol summary">

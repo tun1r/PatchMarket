@@ -209,7 +209,7 @@ h2 {
   border-radius: 10px;
   display: grid;
   gap: 16px;
-  grid-template-columns: 140px minmax(260px, 1fr) auto;
+  grid-template-columns: 140px minmax(240px, 1fr) minmax(280px, auto) auto;
   margin-bottom: 16px;
   padding: 14px;
 }
@@ -227,6 +227,47 @@ h2 {
 .controls {
   display: flex;
   gap: 8px;
+}
+
+.demo-modes {
+  display: flex;
+  gap: 16px;
+}
+
+.mode-group {
+  min-width: 0;
+}
+
+.segmented {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.segment {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.segment.active {
+  background: var(--cyan-soft);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.segment:disabled {
+  opacity: 0.35;
+}
+
+.demo-status-row {
+  margin-bottom: 16px;
+}
+
+.demo-status {
+  color: var(--muted);
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .hero-strip {
@@ -557,6 +598,10 @@ tr.selected {
 @media (max-width: 920px) {
   .command-strip {
     grid-template-columns: 1fr;
+  }
+
+  .demo-modes {
+    flex-direction: column;
   }
 
   .controls,

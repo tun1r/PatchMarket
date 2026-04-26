@@ -18,12 +18,24 @@ import {
   validatePaymentProof
 } from "./core.mjs";
 import { applyUnifiedPatch, verifyPatchWithRunner } from "./verifier.mjs";
+import { runBuyer } from "./buyer.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const publicDir = path.join(rootDir, "public");
 
 let currentJob = createDemoJob();
+let currentOrigin = "http://127.0.0.1:3000";
+let activeBuyerRun = null;
+let lastBuyerRun = {
+  status: "idle",
+  mode: null,
+  model: null,
+  error: null,
+  summary: null,
+  startedAt: null,
+  finishedAt: null
+};
 
 export async function startServer({ port = 3000, host = "127.0.0.1" } = {}) {
   const server = http.createServer(handleRequest);
@@ -31,6 +43,10 @@ export async function startServer({ port = 3000, host = "127.0.0.1" } = {}) {
     server.once("error", reject);
     server.listen(port, host, resolve);
   });
+  const address = server.address();
+  if (typeof address === "object" && address) {
+    currentOrigin = `http://${host}:${address.port}`;
+  }
   return server;
 }
 
@@ -42,9 +58,46 @@ async function handleRequest(req, res) {
       return json(res, 200, { job: publicJob(currentJob) });
     }
 
+    if (url.pathname === "/v1/demo/run-state" && req.method === "GET") {
+      return json(res, 200, { run: lastBuyerRun });
+    }
+
+    if (url.pathname === "/v1/demo/run" && req.method === "POST") {
+      if (activeBuyerRun) {
+        return json(res, 409, {
+          error: {
+            code: "demo.run_in_progress",
+            message: "A live buyer run is already in progress.",
+            cause: "PatchMarket only runs one buyer flow at a time in this demo server.",
+            fix: "Wait for the current run to finish or reset the demo after it completes.",
+            retryable: true
+          },
+          run: lastBuyerRun
+        });
+      }
+
+      const body = await readJson(req);
+      startBuyerRun({
+        mode: body.mode || "openai",
+        model: body.model || undefined
+      });
+      return json(res, 202, { run: lastBuyerRun });
+    }
+
     if (url.pathname === "/v1/jobs/reset" && req.method === "POST") {
       await restoreWorkspaceFixture();
       currentJob = createDemoJob();
+      if (!activeBuyerRun) {
+        lastBuyerRun = {
+          status: "idle",
+          mode: null,
+          model: null,
+          error: null,
+          summary: null,
+          startedAt: null,
+          finishedAt: null
+        };
+      }
       return json(res, 200, { job: publicJob(currentJob), workspace: { state: "baseline" } });
     }
 
@@ -179,6 +232,45 @@ async function handleRequest(req, res) {
       }
     });
   }
+}
+
+function startBuyerRun({ mode = "openai", model } = {}) {
+  lastBuyerRun = {
+    status: "running",
+    mode,
+    model: model || null,
+    error: null,
+    summary: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null
+  };
+
+  activeBuyerRun = runBuyer({
+    baseUrl: currentOrigin,
+    mode,
+    model,
+    log: () => {}
+  })
+    .then((summary) => {
+      lastBuyerRun = {
+        ...lastBuyerRun,
+        status: "completed",
+        summary,
+        error: null,
+        finishedAt: new Date().toISOString()
+      };
+    })
+    .catch((error) => {
+      lastBuyerRun = {
+        ...lastBuyerRun,
+        status: "failed",
+        error: error.message,
+        finishedAt: new Date().toISOString()
+      };
+    })
+    .finally(() => {
+      activeBuyerRun = null;
+    });
 }
 
 async function restoreWorkspaceFixture() {

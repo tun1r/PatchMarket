@@ -18,7 +18,7 @@ export async function runBuyer({
   rootDir = defaultRootDir,
   log = console.log
 } = {}) {
-  const resolvedApiKey = apiKey || (await readLocalSecret(rootDir, "OPENAI_API_KEY"));
+  const resolvedApiKey = apiKey || (await resolveBuyerApiKey(rootDir));
   const runtime = {
     baseUrl: baseUrl.replace(/\/$/, ""),
     model,
@@ -48,6 +48,10 @@ export async function runBuyer({
   }
 
   return runScriptedBuyer(runtime);
+}
+
+export async function resolveBuyerApiKey(rootDir = defaultRootDir) {
+  return process.env.OPENAI_API_KEY || (await readLocalSecret(rootDir, "OPENAI_API_KEY"));
 }
 
 function resolveBuyerMode(mode, apiKey) {
@@ -104,7 +108,8 @@ async function runOpenAiBuyer(runtime) {
     "Use the provided tools to delegate a red CI fix through PatchMarket.",
     "Always begin by inspecting the red CI fixture, then create a PatchMarket job, inspect offers, and choose a worker.",
     "Prefer the lowest expected cost to green while keeping pass rate at or above 90% when available.",
-    "Before each material action, call post_buyer_event with one short factual update suitable for a judge-facing UI.",
+    "Before each material action, call post_buyer_event with type buyer.reasoning and one short factual update suitable for a judge-facing UI.",
+    "Use these buyer event titles when they fit: Inspecting red CI, Opening PatchMarket job, Reviewing offers, Selecting worker, Requesting 402 challenge, Submitting L402 proof, Solving Agent CAPTCHA, Requesting worker patch, Verifying patch, Confirming job state.",
     "Do not expose chain-of-thought. Buyer events must be concise operational rationale, not private reasoning.",
     "After selection, complete the claim flow: 402 challenge, L402 proof, Agent CAPTCHA, patch request, verifier run.",
     "Finish with a short summary mentioning the chosen worker, exit code change, and whether escrow released."
@@ -284,9 +289,7 @@ async function executeBuyerTool(runtime, name, args) {
 
   if (name === "post_buyer_event") {
     await postBuyerEvent(runtime, {
-      type: args.type || "buyer.reasoning",
-      title: args.title,
-      detail: args.detail
+      ...normalizeBuyerEvent(args)
     });
     return { ok: true };
   }
@@ -432,7 +435,7 @@ async function postBuyerEvent(runtime, event) {
   if (!runtime.job?.id) return null;
   const response = await fetchJson(runtime, `/v1/jobs/${runtime.job.id}/buyer-events`, {
     method: "POST",
-    body: event
+    body: normalizeBuyerEvent(event)
   });
   runtime.job = response.job;
   return response;
@@ -513,6 +516,30 @@ function ensureActiveJob(runtime, toolName) {
   if (!runtime.job?.id) {
     throw new Error(`${toolName} requires an active PatchMarket job. Create the job first.`);
   }
+}
+
+function normalizeBuyerEvent(event = {}) {
+  return {
+    type: "buyer.reasoning",
+    title: normalizeBuyerTitle(String(event.title || "Buyer update").trim()),
+    detail: String(event.detail || "").trim(),
+    data: event.data || {}
+  };
+}
+
+function normalizeBuyerTitle(title) {
+  const value = title.toLowerCase();
+  if (value.includes("inspect") && value.includes("red")) return "Inspecting red CI";
+  if (value.includes("job state")) return "Confirming job state";
+  if (value.includes("creat") || value.includes("opening") || value.includes("patchmarket job")) return "Opening PatchMarket job";
+  if (value.includes("offer") || value.includes("review")) return "Reviewing offers";
+  if (value.includes("select")) return "Selecting worker";
+  if (value.includes("402") || value.includes("claim challenge")) return "Requesting 402 challenge";
+  if (value.includes("l402")) return "Submitting L402 proof";
+  if (value.includes("captcha")) return "Solving Agent CAPTCHA";
+  if (value.includes("worker patch") || value.includes("requesting patch")) return "Requesting worker patch";
+  if (value.includes("verify")) return "Verifying patch";
+  return title;
 }
 
 async function inspectRedCi(runtime) {

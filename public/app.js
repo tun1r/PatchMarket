@@ -18,6 +18,12 @@ const heroAgent = document.querySelector("#hero-agent");
 const proofMetrics = document.querySelector("#proof-metrics");
 const applyBtn = document.querySelector("#apply-btn");
 const applyStatus = document.querySelector("#apply-status");
+const liveModeBtn = document.querySelector("#mode-live-btn");
+const replayModeBtn = document.querySelector("#mode-replay-btn");
+const modelMiniBtn = document.querySelector("#model-mini-btn");
+const modelGpt5Btn = document.querySelector("#model-gpt5-btn");
+const modelGroup = document.querySelector("#model-group");
+const demoStatus = document.querySelector("#demo-status");
 const runBtn = document.querySelector("#run-btn");
 const stepBtn = document.querySelector("#step-btn");
 const resetBtn = document.querySelector("#reset-btn");
@@ -41,6 +47,15 @@ let currentStep = 0;
 let running = false;
 let activeArtifact = "diff";
 let workspaceStatus = "Patch not applied to workspace.";
+let demoMode = "live";
+let selectedModel = "gpt-5.1-codex-mini";
+let runState = {
+  status: "idle",
+  mode: "openai",
+  model: selectedModel,
+  error: null,
+  summary: null
+};
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -54,10 +69,14 @@ const steps = [
   verifyPatchStep
 ];
 
-runBtn.addEventListener("click", runProtocol);
+runBtn.addEventListener("click", handleRun);
 stepBtn.addEventListener("click", stepProtocol);
 resetBtn.addEventListener("click", resetDemo);
 applyBtn.addEventListener("click", applyWorkspacePatch);
+liveModeBtn.addEventListener("click", () => setDemoMode("live"));
+replayModeBtn.addEventListener("click", () => setDemoMode("replay"));
+modelMiniBtn.addEventListener("click", () => setSelectedModel("gpt-5.1-codex-mini"));
+modelGpt5Btn.addEventListener("click", () => setSelectedModel("gpt-5"));
 
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -71,7 +90,7 @@ setButtons(false);
 render();
 await syncCurrentJob();
 setInterval(() => {
-  syncCurrentJob().catch(console.error);
+  Promise.all([syncCurrentJob(), syncRunState()]).catch(console.error);
 }, 1000);
 
 async function resetDemo() {
@@ -84,8 +103,31 @@ async function resetDemo() {
   claimCredential = null;
   recommendedOffer = job.recommendedOffer || null;
   workspaceStatus = "Fixture reset to red baseline.";
+  runState = {
+    status: "idle",
+    mode: "openai",
+    model: selectedModel,
+    error: null,
+    summary: null
+  };
   setButtons(false);
   clearProto();
+  render();
+}
+
+async function handleRun() {
+  if (demoMode === "replay") {
+    return runProtocol();
+  }
+
+  if (runState.status === "running") return;
+  demoStatus.textContent = `Starting live buyer with ${selectedModel}...`;
+  const response = await fetchJson("/v1/demo/run", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ mode: "openai", model: selectedModel })
+  });
+  runState = response.run;
   render();
 }
 
@@ -218,14 +260,35 @@ async function syncCurrentJob() {
   }
 }
 
+async function syncRunState() {
+  const response = await fetchJson("/v1/demo/run-state");
+  if (JSON.stringify(response.run) !== JSON.stringify(runState)) {
+    runState = response.run;
+    render();
+  }
+}
+
 function render() {
   renderStatus();
+  renderControls();
   renderHero();
   renderEvents();
   renderScores();
   renderProofMetrics();
   renderProofActions();
   renderArtifact();
+}
+
+function renderControls() {
+  liveModeBtn.classList.toggle("active", demoMode === "live");
+  replayModeBtn.classList.toggle("active", demoMode === "replay");
+  modelMiniBtn.classList.toggle("active", selectedModel === "gpt-5.1-codex-mini");
+  modelGpt5Btn.classList.toggle("active", selectedModel === "gpt-5");
+  modelGroup.style.opacity = demoMode === "live" ? "1" : "0.45";
+  modelMiniBtn.disabled = demoMode !== "live";
+  modelGpt5Btn.disabled = demoMode !== "live";
+  stepBtn.disabled = demoMode !== "replay" || (running && demoMode === "replay");
+  demoStatus.textContent = renderDemoStatus();
 }
 
 function renderStatus() {
@@ -535,6 +598,13 @@ function clearProto() {
 }
 
 function setButtons(isBusy) {
+  if (demoMode === "live") {
+    runBtn.textContent = runState.status === "running" ? "Live Buyer Running" : "Run Live Buyer";
+    runBtn.disabled = runState.status === "running";
+    stepBtn.disabled = true;
+    return;
+  }
+
   runBtn.textContent = currentStep >= steps.length ? "Replay" : "Run Replay";
   runBtn.disabled = isBusy;
   stepBtn.disabled = isBusy && running;
@@ -564,4 +634,41 @@ function compactHash(value, head = 8, tail = 4) {
 function compactExecutionMode(value) {
   if (value === "temp-worktree-runner") return "temp-worktree";
   return value;
+}
+
+function setDemoMode(nextMode) {
+  demoMode = nextMode;
+  setButtons(running);
+  render();
+}
+
+function setSelectedModel(model) {
+  selectedModel = model;
+  if (runState.status === "idle") {
+    runState = { ...runState, model };
+  }
+  render();
+}
+
+function renderDemoStatus() {
+  if (demoMode === "replay") {
+    return "Replay mode runs the deterministic fallback path inside the browser.";
+  }
+
+  if (runState.status === "running") {
+    return `Live Buyer is running with ${runState.model || selectedModel}.`;
+  }
+
+  if (runState.status === "failed") {
+    return `Live Buyer failed: ${runState.error}`;
+  }
+
+  if (runState.status === "completed") {
+    if (runState.summary?.mode && runState.summary.mode !== "openai") {
+      return `Live Buyer fell back to ${runState.summary.mode}.`;
+    }
+    return `Live Buyer completed with ${runState.summary?.model || runState.model || selectedModel}.`;
+  }
+
+  return `Live Buyer ready with ${selectedModel}.`;
 }

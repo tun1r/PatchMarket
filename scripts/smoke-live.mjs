@@ -1,5 +1,20 @@
-import { runBuyer } from "../src/buyer.mjs";
+import { resolveBuyerApiKey, runBuyer } from "../src/buyer.mjs";
 import { startServer } from "../src/server.mjs";
+
+const apiKey = await resolveBuyerApiKey(process.cwd());
+if (!apiKey) {
+  console.log(
+    JSON.stringify(
+      {
+        skipped: true,
+        reason: "OPENAI_API_KEY not configured. Live smoke skipped."
+      },
+      null,
+      2
+    )
+  );
+  process.exit(0);
+}
 
 const server = await startServer({ port: 0 });
 const { port } = server.address();
@@ -9,6 +24,7 @@ try {
   const summary = await runBuyer({
     baseUrl,
     mode: "openai",
+    apiKey,
     log: () => {}
   });
 
