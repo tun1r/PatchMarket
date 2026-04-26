@@ -40,6 +40,12 @@ if (isSpectator) {
 }
 const POLL_MS = isSpectator ? 500 : 1000;
 
+// Scene stage — full-screen cinematic overlays for the 8 protocol moments.
+const sceneStage = document.querySelector("#scene-stage");
+const sceneSeen = new Set();
+const sceneQueue = [];
+let scenePlaying = false;
+
 const protoMap = {
   "l402.challenge": "proto-402",
   "l402.proof_accepted": "proto-proof",
@@ -110,6 +116,309 @@ if (isSpectator) {
   }, 600);
 }
 
+function maybeQueueScenes() {
+  if (!isSpectator || !sceneStage || !job?.events) return;
+  const triggerOrder = [
+    { id: "ci.red", build: buildSceneCiFailed, hold: 4200 },
+    { id: "worker.scored", build: buildSceneBidding, hold: 5400 },
+    { id: "worker.selected", build: buildSceneDelegating, hold: 3600 },
+    { id: "l402.challenge", build: buildScene402, hold: 5000 },
+    { id: "agent_captcha.solved", build: buildSceneCaptcha, hold: 4400 },
+    { id: "worker.patching", build: buildScenePatch, hold: 5400 },
+    { id: "verify.passed", build: buildSceneGreen, hold: 4400 },
+    { id: "payment.released", build: buildSceneSats, hold: 5400 }
+  ];
+
+  for (const event of job.events) {
+    const trigger = triggerOrder.find((t) => t.id === event.type);
+    if (!trigger) continue;
+    if (sceneSeen.has(event.type)) continue;
+    sceneSeen.add(event.type);
+    sceneQueue.push({ trigger, event });
+  }
+  drainSceneQueue();
+}
+
+function drainSceneQueue() {
+  if (scenePlaying) return;
+  const next = sceneQueue.shift();
+  if (!next) return;
+  scenePlaying = true;
+  const { trigger, event } = next;
+
+  const node = trigger.build(event, job);
+  sceneStage.innerHTML = "";
+  sceneStage.appendChild(node);
+  sceneStage.classList.add("is-active");
+  sceneStage.setAttribute("aria-hidden", "false");
+  // Force reflow then add is-playing so the animation runs.
+  // eslint-disable-next-line no-unused-expressions
+  node.getBoundingClientRect();
+  node.classList.add("is-playing");
+
+  // Per-scene custom animation hooks fire after enter.
+  if (typeof node.dataset.onEnter === "string") {
+    const enterFn = node._onEnter;
+    if (typeof enterFn === "function") {
+      try {
+        enterFn();
+      } catch (error) {
+        console.error("scene enter error", error);
+      }
+    }
+  }
+
+  setTimeout(() => {
+    node.classList.add("is-leaving");
+    setTimeout(() => {
+      sceneStage.innerHTML = "";
+      sceneStage.classList.remove("is-active");
+      sceneStage.setAttribute("aria-hidden", "true");
+      scenePlaying = false;
+      // Brief gap before next scene so the dashboard is visible between.
+      setTimeout(drainSceneQueue, 100);
+    }, 220);
+  }, trigger.hold);
+}
+
+function makeSceneEl(className, content = "") {
+  const el = document.createElement("section");
+  el.className = `scene ${className}`;
+  el.innerHTML = content;
+  return el;
+}
+
+function buildSceneCiFailed(event, currentJob) {
+  const file = currentJob.fixture?.acceptanceCommand?.split(" ").pop() || "tests/auth.test.mjs";
+  const failingLine =
+    currentJob.fixture?.beforeLog
+      ?.split("\n")
+      .find((line) => line.startsWith("not ok")) || "not ok 2 - rejects expired token";
+  return makeSceneEl(
+    "scene-ci-failed",
+    `
+    <span class="scene-eyebrow">CI status</span>
+    <h2 class="scene-title is-red">Tests failing</h2>
+    <p class="scene-subtitle">The buyer's coding agent is stuck. Continuing on tokens won't help — it needs a verified fix.</p>
+    <div class="scene-tap">$ node --test ${escapeHtml(file)}\n${escapeHtml(failingLine)}</div>
+    `
+  );
+}
+
+function buildSceneBidding(event) {
+  const offers = event.data?.offers || [];
+  const recommended = event.data?.recommended || offers[0];
+  const card = (offer) => `
+    <div class="bidding-card${offer.workerId === recommended?.workerId ? " is-winner-target" : ""}" data-worker="${escapeHtml(offer.workerId)}">
+      <span class="winner-badge">Selected</span>
+      <span class="card-eyebrow">Worker</span>
+      <div class="card-name">${escapeHtml(offer.name)}</div>
+      <div class="card-meta">${escapeHtml(offer.model)} · ${escapeHtml(offer.harness)}</div>
+      <div class="card-row"><span class="k">price</span><span class="v">${offer.priceSats.toLocaleString()} sats</span></div>
+      <div class="card-row"><span class="k">pass rate</span><span class="v">${Math.round(offer.passRate * 100)}%</span></div>
+      <div class="card-row"><span class="k">latency</span><span class="v">${offer.latencySec}s</span></div>
+      <div class="card-row"><span class="k">expected to green</span><span class="v">${offer.expectedCostToGreen.toLocaleString()} sats</span></div>
+    </div>
+  `;
+  const node = makeSceneEl(
+    "scene-bidding",
+    `
+    <span class="scene-eyebrow">Bidding</span>
+    <h2 class="scene-title">Two workers quote the job</h2>
+    <p class="scene-subtitle">Buyer compares price, pass rate, and latency. Picks the lowest expected cost to green.</p>
+    <div class="bidding-cards">${offers.map(card).join("")}</div>
+    `
+  );
+  node._onEnter = () => {
+    setTimeout(() => {
+      node.querySelectorAll(".bidding-card.is-winner-target").forEach((el) => {
+        el.classList.add("is-winner");
+      });
+    }, 1800);
+  };
+  node.dataset.onEnter = "1";
+  return node;
+}
+
+function buildSceneDelegating(event) {
+  const buyerName = event.data?.actor || "Codex buyer agent";
+  const workerName = event.data?.selected?.name || "PatchPro";
+  const workerId = event.data?.selected?.workerId || "patchpro";
+  return makeSceneEl(
+    "scene-delegating",
+    `
+    <span class="scene-eyebrow">Delegating</span>
+    <h2 class="scene-title">Agent hires agent</h2>
+    <p class="scene-subtitle">Buyer agent delegates the bounded work order to a separate worker process.</p>
+    <div class="delegating-flow">
+      <div class="agent-node">
+        <span class="role">Buyer</span>
+        <div class="name">${escapeHtml(buyerName.includes("buyer") ? buyerName : "Buyer · gpt-5.1-codex-mini")}</div>
+        <div class="pid">posted /v1/jobs/fix</div>
+      </div>
+      <div class="agent-arrow"><span class="arrow-label">L402 escrow</span></div>
+      <div class="agent-node">
+        <span class="role">Worker</span>
+        <div class="name">${escapeHtml(workerName)}</div>
+        <div class="pid">${escapeHtml(workerId)} · ready</div>
+      </div>
+    </div>
+    `
+  );
+}
+
+function buildScene402(event) {
+  const offer = event.data || {};
+  const sats = offer.amountSats ? offer.amountSats.toLocaleString() : "2,800";
+  const invoice = offer.invoiceHash || "";
+  const compact = invoice
+    ? `${invoice.slice(0, 12)}…${invoice.slice(-6)}`
+    : "pending";
+  return makeSceneEl(
+    "scene-402",
+    `
+    <span class="scene-eyebrow">Money moment</span>
+    <h2 class="scene-hero-number is-amber">402</h2>
+    <p class="scene-subtitle">Payment Required — server returns L402 challenge before granting claim.</p>
+    <div class="auth-line">WWW-Authenticate: L402 invoiceHash="${escapeHtml(compact)}", amountSats="${escapeHtml(String(offer.amountSats || ""))}"</div>
+    <div class="amount">${sats} sats</div>
+    `
+  );
+}
+
+function buildSceneCaptcha(event) {
+  const data = event.data || {};
+  const node = makeSceneEl(
+    "scene-captcha",
+    `
+    <span class="scene-eyebrow">Agent CAPTCHA</span>
+    <h2 class="scene-title is-amber">Worker proves it can run code</h2>
+    <p class="scene-subtitle">A claim gate, not a trust primitive. Worker reads bytes, runs transforms, signs HMAC under 30s.</p>
+    <div class="captcha-chain">
+      <div class="captcha-step" data-step="1"><span class="label">32 random bytes issued</span><span class="value">dataB64</span></div>
+      <div class="captcha-step" data-step="2"><span class="label">reverse_xor(0..15, key=0xA3)</span><span class="value">→ 16 bytes</span></div>
+      <div class="captcha-step" data-step="3"><span class="label">sum_mod_repeat(16..31)</span><span class="value">→ 8 bytes</span></div>
+      <div class="captcha-step" data-step="4"><span class="label">sha256_truncate(0..31, 8)</span><span class="value">→ 8 bytes</span></div>
+      <div class="captcha-step" data-step="5"><span class="label">hmac(nonce, sha256(concat))</span><span class="value">${escapeHtml(data.hmacHash ? data.hmacHash.slice(0, 12) + "…" : "verified")}</span></div>
+    </div>
+    `
+  );
+  node._onEnter = () => {
+    const steps = node.querySelectorAll(".captcha-step");
+    steps.forEach((step, i) => {
+      setTimeout(() => step.classList.add("is-on"), 150 + i * 380);
+      setTimeout(() => step.classList.add("is-done"), 150 + i * 380 + 320);
+    });
+  };
+  node.dataset.onEnter = "1";
+  return node;
+}
+
+function buildScenePatch(event, currentJob) {
+  const patch = currentJob.patchSubmission?.patch || "";
+  const lines = patch
+    ? patch.split("\n").slice(0, 10)
+    : [
+        "diff --git a/src/auth.mjs b/src/auth.mjs",
+        "@@",
+        " export function isTokenExpired(expiresAt, now = Date.now()) {",
+        "-  return expiresAt < now - 30000;",
+        "+  return expiresAt <= now;",
+        " }"
+      ];
+
+  const lineMarkup = lines
+    .map((line) => {
+      let cls = "diff-line";
+      if (line.startsWith("+") && !line.startsWith("+++")) cls += " add";
+      else if (line.startsWith("-") && !line.startsWith("---")) cls += " del";
+      return `<span class="${cls}">${escapeHtml(line) || "&nbsp;"}</span>`;
+    })
+    .join("");
+
+  const node = makeSceneEl(
+    "scene-patch",
+    `
+    <span class="scene-eyebrow">Worker writing patch</span>
+    <h2 class="scene-title">PatchPro generates the diff</h2>
+    <p class="scene-subtitle">Bounded scope: src/auth.mjs only. Tests and scripts are locked.</p>
+    <div class="diff-window">
+      <div class="diff-header">$ patchpro generate --allowed src/auth.mjs</div>
+      <div class="diff-body">${lineMarkup}</div>
+    </div>
+    `
+  );
+  node._onEnter = () => {
+    const lineEls = node.querySelectorAll(".diff-line");
+    lineEls.forEach((el, i) => {
+      setTimeout(() => el.classList.add("is-on"), 200 + i * 220);
+    });
+  };
+  node.dataset.onEnter = "1";
+  return node;
+}
+
+function buildSceneGreen(event, currentJob) {
+  const proof = currentJob.verificationProof || event.data?.proof || {};
+  const before = proof.exitCodeBefore ?? 1;
+  const after = proof.exitCodeAfter ?? 0;
+  const tap =
+    currentJob.events?.find((e) => e.type === "verify.passed")?.data?.afterLog ||
+    currentJob.fixture?.afterLog ||
+    "";
+  const greenLine = tap
+    .split("\n")
+    .filter((line) => /pass|fail 0|ok 2/.test(line))
+    .slice(0, 3)
+    .join("\n");
+  return makeSceneEl(
+    "scene-green",
+    `
+    <span class="scene-eyebrow">Verifier accepted patch</span>
+    <h2 class="scene-title is-green">Tests are green</h2>
+    <div class="exit-flip">
+      <span class="from">exit ${before}</span>
+      <span class="arrow">→</span>
+      <span class="to">exit ${after}</span>
+    </div>
+    <p class="scene-subtitle">Real Node subprocess in a temp worktree ran the pinned acceptance command and signed before/after logs.</p>
+    ${greenLine ? `<div class="tap-line">${escapeHtml(greenLine)}</div>` : ""}
+    `
+  );
+}
+
+function buildSceneSats(event, currentJob) {
+  const sats = currentJob.reputationEvent?.deltaEarnedSats || event.data?.deltaEarnedSats || 2800;
+  const workerName = currentJob.selectedOffer?.name || "PatchPro";
+  return makeSceneEl(
+    "scene-sats",
+    `
+    <span class="scene-eyebrow">Escrow released</span>
+    <h2 class="scene-title is-amber">Sats fly to ${escapeHtml(workerName)}</h2>
+    <div class="sats-arc">
+      <div class="agent-node">
+        <span class="role">Buyer</span>
+        <div class="name">Codex</div>
+        <div class="pid">released escrow</div>
+      </div>
+      <div class="agent-arrow">
+        <span class="arrow-label">⚡ Lightning</span>
+        <span class="sat-coin"></span>
+        <span class="sat-coin"></span>
+        <span class="sat-coin"></span>
+      </div>
+      <div class="agent-node">
+        <span class="role">Worker</span>
+        <div class="name">${escapeHtml(workerName)}</div>
+        <div class="pid">reputation +1</div>
+      </div>
+    </div>
+    <div class="scene-hero-number is-amber">${sats.toLocaleString()}</div>
+    <p class="scene-subtitle">Worker only paid because the verifier signed exit 1 → exit 0. Pay for outcomes, not tokens.</p>
+    `
+  );
+}
+
 async function autoStartSpectator() {
   if (runState.status === "running" || job?.state === "released") return;
   if (job && job.state !== "posted") {
@@ -143,6 +452,8 @@ async function resetDemo() {
     error: null,
     summary: null
   };
+  sceneSeen.clear();
+  sceneQueue.length = 0;
   setButtons(false);
   clearProto();
   render();
@@ -310,6 +621,7 @@ function render() {
   renderProofMetrics();
   renderProofActions();
   renderArtifact();
+  maybeQueueScenes();
 }
 
 function renderControls() {

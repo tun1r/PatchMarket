@@ -1,0 +1,612 @@
+/* PatchMarket scene stage — full-screen cinematic overlays.
+ *
+ * In spectator mode (?demo=1), key protocol moments fire as full-screen
+ * scenes that take over the canvas for 4–6s. The lanes underneath stay
+ * mounted but are visually hidden during a scene.
+ *
+ * Aesthetic: pure-black canvas, single warm-amber accent, oversized tabular
+ * numerics, hairline borders, 220ms ease-out fade+scale enter/exit.
+ * Inspired by Vercel's product pages and Anthropic's docs surfaces.
+ */
+
+.scene-stage {
+  align-items: center;
+  background: #000;
+  display: none;
+  inset: 0;
+  justify-content: center;
+  padding: 56px;
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+body[data-mode="demo"] .scene-stage.is-active {
+  display: flex;
+}
+
+.scene {
+  align-items: center;
+  display: none;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1100px;
+  text-align: center;
+  width: 100%;
+}
+
+.scene.is-playing {
+  animation: sceneEnter 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  display: flex;
+}
+
+.scene.is-leaving {
+  animation: sceneExit 200ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes sceneEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sceneExit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.scene-eyebrow {
+  color: rgba(255, 255, 255, 0.45);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.scene-title {
+  color: #f6efe2;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 88px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin: 0;
+}
+
+.scene-title.is-amber {
+  color: #d4a155;
+}
+
+.scene-title.is-red {
+  color: #c46a5e;
+}
+
+.scene-title.is-green {
+  color: #7a9b6e;
+}
+
+.scene-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  line-height: 1.4;
+  margin: 0;
+  max-width: 680px;
+}
+
+.scene-mono {
+  color: rgba(255, 255, 255, 0.78);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 14px;
+  letter-spacing: 0.005em;
+  line-height: 1.55;
+}
+
+.scene-hero-number {
+  color: #d4a155;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 220px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.06em;
+  line-height: 0.9;
+}
+
+.scene-hero-number.is-red {
+  color: #c46a5e;
+}
+
+.scene-hero-number.is-green {
+  color: #7a9b6e;
+}
+
+/* SCENE 1 — CI failed */
+.scene-ci-failed .scene-tap {
+  background: rgba(196, 106, 94, 0.06);
+  border: 1px solid rgba(196, 106, 94, 0.2);
+  border-radius: 6px;
+  color: #d68a82;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 14px;
+  margin-top: 8px;
+  padding: 14px 20px;
+  text-align: left;
+  white-space: pre;
+}
+
+/* SCENE 2 — Bidding */
+.scene-bidding .bidding-cards {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(2, minmax(280px, 360px));
+  margin-top: 16px;
+}
+
+.bidding-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 24px 22px;
+  position: relative;
+  text-align: left;
+  transition: border-color 320ms ease, background 320ms ease, transform 320ms ease;
+}
+
+.bidding-card .card-eyebrow {
+  color: rgba(255, 255, 255, 0.4);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bidding-card .card-name {
+  color: #f6efe2;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin-top: 6px;
+}
+
+.bidding-card .card-meta {
+  color: rgba(255, 255, 255, 0.55);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.bidding-card .card-row {
+  display: flex;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.bidding-card .card-row:first-of-type {
+  margin-top: 22px;
+}
+
+.bidding-card .card-row .k {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.bidding-card .card-row .v {
+  color: #f6efe2;
+  font-variant-numeric: tabular-nums;
+}
+
+.bidding-card .card-expected {
+  color: #d4a155;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 36px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-top: 16px;
+}
+
+.bidding-card.is-winner {
+  background: rgba(212, 161, 85, 0.04);
+  border-color: #d4a155;
+  transform: translateY(-2px);
+}
+
+.bidding-card .winner-badge {
+  background: #d4a155;
+  border-radius: 999px;
+  color: #110d09;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  left: 20px;
+  letter-spacing: 0.12em;
+  opacity: 0;
+  padding: 4px 10px;
+  position: absolute;
+  text-transform: uppercase;
+  top: -12px;
+  transition: opacity 200ms ease;
+}
+
+.bidding-card.is-winner .winner-badge {
+  opacity: 1;
+}
+
+/* SCENE 3 — Delegating */
+.scene-delegating .delegating-flow {
+  align-items: center;
+  display: flex;
+  gap: 0;
+  justify-content: center;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.agent-node {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  min-width: 220px;
+  padding: 22px 26px;
+  text-align: left;
+}
+
+.agent-node .role {
+  color: rgba(255, 255, 255, 0.4);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.agent-node .name {
+  color: #f6efe2;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin-top: 6px;
+}
+
+.agent-node .pid {
+  color: rgba(255, 255, 255, 0.5);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.agent-arrow {
+  align-items: center;
+  color: rgba(255, 255, 255, 0.3);
+  display: flex;
+  flex: 0 0 200px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  height: 2px;
+  justify-content: center;
+  letter-spacing: 0.1em;
+  position: relative;
+}
+
+.agent-arrow::before {
+  background: linear-gradient(
+    to right,
+    rgba(212, 161, 85, 0) 0%,
+    rgba(212, 161, 85, 0.6) 30%,
+    rgba(212, 161, 85, 0.6) 70%,
+    rgba(212, 161, 85, 0) 100%
+  );
+  content: "";
+  height: 1px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 50%;
+}
+
+.agent-arrow::after {
+  border-color: transparent transparent transparent #d4a155;
+  border-style: solid;
+  border-width: 6px 0 6px 9px;
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: -5px;
+}
+
+.agent-arrow .arrow-label {
+  background: #000;
+  padding: 0 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* SCENE 4 — 402 Payment Required */
+.scene-402 {
+  gap: 16px;
+}
+
+.scene-402 .scene-hero-number {
+  font-size: 280px;
+  letter-spacing: -0.07em;
+}
+
+.scene-402 .auth-line {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  margin-top: 4px;
+  max-width: 720px;
+  padding: 12px 18px;
+}
+
+.scene-402 .amount {
+  color: #d4a155;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 56px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin-top: 16px;
+}
+
+/* SCENE 5 — CAPTCHA */
+.scene-captcha .captcha-chain {
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  max-width: 640px;
+  width: 100%;
+}
+
+.captcha-step {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  display: flex;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 14px;
+  gap: 14px;
+  justify-content: space-between;
+  opacity: 0;
+  padding: 14px 20px;
+  text-align: left;
+  transition: border-color 200ms ease, opacity 200ms ease;
+}
+
+.captcha-step.is-on {
+  opacity: 1;
+}
+
+.captcha-step.is-done {
+  border-color: rgba(212, 161, 85, 0.4);
+  opacity: 1;
+}
+
+.captcha-step .label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.captcha-step .value {
+  color: #d4a155;
+  font-variant-numeric: tabular-nums;
+}
+
+/* SCENE 6 — Patch typewriter */
+.scene-patch .diff-window {
+  background: #0a0907;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  margin-top: 12px;
+  max-width: 760px;
+  overflow: hidden;
+  text-align: left;
+  width: 100%;
+}
+
+.scene-patch .diff-header {
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 10px 18px;
+}
+
+.scene-patch .diff-body {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 14px;
+  line-height: 1.65;
+  padding: 16px 18px 20px;
+  white-space: pre;
+}
+
+.diff-line {
+  color: rgba(255, 255, 255, 0.78);
+  display: block;
+  opacity: 0;
+}
+
+.diff-line.is-on {
+  opacity: 1;
+}
+
+.diff-line.add {
+  color: #b1c79c;
+}
+
+.diff-line.del {
+  color: #d68a82;
+}
+
+/* SCENE 7 — Tests Green */
+.scene-green .exit-flip {
+  align-items: baseline;
+  display: flex;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 200px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  gap: 24px;
+  letter-spacing: -0.06em;
+  line-height: 0.9;
+}
+
+.exit-flip .from {
+  color: #c46a5e;
+}
+
+.exit-flip .arrow {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 120px;
+}
+
+.exit-flip .to {
+  color: #7a9b6e;
+}
+
+.scene-green .tap-line {
+  background: rgba(122, 155, 110, 0.08);
+  border: 1px solid rgba(122, 155, 110, 0.2);
+  border-radius: 6px;
+  color: #b1c79c;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 14px;
+  margin-top: 8px;
+  padding: 12px 20px;
+  text-align: left;
+  white-space: pre;
+}
+
+/* SCENE 8 — Sats released */
+.scene-sats .sats-arc {
+  align-items: center;
+  display: flex;
+  gap: 0;
+  justify-content: center;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.scene-sats .agent-arrow {
+  flex: 0 0 240px;
+}
+
+.scene-sats .scene-hero-number {
+  font-size: 240px;
+  margin-top: 24px;
+}
+
+.scene-sats .sat-coin {
+  background: #d4a155;
+  border-radius: 50%;
+  bottom: -3px;
+  height: 7px;
+  position: absolute;
+  width: 7px;
+  animation: satFly 1.4s ease-in-out infinite;
+}
+
+.scene-sats .sat-coin:nth-child(1) {
+  animation-delay: 0s;
+}
+.scene-sats .sat-coin:nth-child(2) {
+  animation-delay: 0.45s;
+}
+.scene-sats .sat-coin:nth-child(3) {
+  animation-delay: 0.9s;
+}
+
+@keyframes satFly {
+  0% {
+    left: 8px;
+    opacity: 0;
+    transform: translateY(0) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1);
+  }
+  100% {
+    left: calc(100% - 14px);
+    opacity: 0;
+    transform: translateY(0) scale(0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene.is-playing,
+  .scene.is-leaving {
+    animation: none !important;
+  }
+  .scene-sats .sat-coin {
+    animation: none !important;
+    opacity: 1 !important;
+    left: 50% !important;
+  }
+}
+
+@media (max-width: 1100px) {
+  .scene-title {
+    font-size: 64px;
+  }
+
+  .scene-hero-number {
+    font-size: 160px;
+  }
+
+  .scene-402 .scene-hero-number {
+    font-size: 200px;
+  }
+
+  .scene-bidding .bidding-cards {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .scene-delegating .delegating-flow {
+    flex-direction: column;
+  }
+
+  .agent-arrow {
+    flex: 0 0 80px;
+    height: 60px;
+    transform: rotate(90deg);
+    width: 80px;
+  }
+
+  .exit-flip {
+    font-size: 120px;
+  }
+
+  .exit-flip .arrow {
+    font-size: 72px;
+  }
+}
