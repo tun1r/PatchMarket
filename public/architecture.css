@@ -606,6 +606,55 @@ kbd {
   padding: 0 6px;
 }
 
+.captcha-chain.four-stage {
+  align-items: center;
+}
+
+.captcha-chain .chain-program {
+  background: rgba(212, 161, 85, 0.04);
+  border: 1px dashed rgba(212, 161, 85, 0.32);
+  border-radius: 6px;
+  display: flex;
+  flex: 1.4;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.captcha-chain .program-label {
+  color: var(--accent);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.captcha-chain .program-step {
+  align-items: baseline;
+  display: grid;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  gap: 8px;
+  grid-template-columns: 16px auto 1fr;
+  line-height: 1.4;
+}
+
+.captcha-chain .program-num {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.captcha-chain .program-op {
+  color: var(--ink-strong);
+  font-weight: 500;
+}
+
+.captcha-chain .program-bytes {
+  color: var(--muted);
+  text-align: right;
+}
+
 /* SCENE 05 — L402 protocol exchange */
 .scene-l402 {
   gap: 18px;

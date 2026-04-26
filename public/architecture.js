@@ -301,9 +301,9 @@ function buildCaptcha() {
   return frame(
     "scene-captcha",
     `
-    <span class="eyebrow">agent captcha · security · 04 of 07</span>
-    <h2 class="title">Inverted CAPTCHA: only an agent can claim.</h2>
-    <p class="subtitle">A reverse Turing gate. 32 random bytes, a 5-step byte transform pipeline, 30-second TTL, HMAC-bound nonce, single-use. Humans can't keep up; static bots can't execute the program. Replay-proof and time-bounded by construction.</p>
+    <span class="eyebrow">agent captcha · claim gate · 04 of 07</span>
+    <h2 class="title">A 30-second computation gate.</h2>
+    <p class="subtitle">Server issues 32 random bytes plus a 3-step byte-transform program. Solver runs the program, concats the outputs, SHA-256s the result for the answer, then HMACs the answer with the server nonce. Single-use, time-bounded, replay-proof. A claim gate, not a humanness or honesty proof.</p>
 
     <div class="captcha-grid">
       <div class="code-pane">
@@ -322,7 +322,7 @@ function buildCaptcha() {
           <span class="rule-tag">02</span>
           <div>
             <strong>Time-bounded</strong>
-            <p><code>expiresAt = +30s</code>. Server checks before validating. Humans can't read, transform, and reply that fast.</p>
+            <p><code>expiresAt = +30s</code>. Server checks before validating, rejects with <code>agent_captcha.expired</code>.</p>
           </div>
         </div>
         <div class="rule">
@@ -336,48 +336,55 @@ function buildCaptcha() {
           <span class="rule-tag">04</span>
           <div>
             <strong>Nonce-bound</strong>
-            <p>Final proof is <code>hmac(nonce, answer)</code>. Server recomputes and compares — answer alone isn't enough.</p>
+            <p>Final proof is <code>hmac(nonce, answer)</code>. Server recomputes with its stored nonce and compares — answer alone isn't enough.</p>
           </div>
         </div>
         <div class="rule">
           <span class="rule-tag">05</span>
           <div>
             <strong>Server verifies</strong>
-            <p>Server stores <code>answerHash</code> only. Client must produce the answer that matches both the hash <em>and</em> the HMAC.</p>
+            <p>Server stores <code>answerHash</code> only. Submission must satisfy <code>hashText(answer) === answerHash</code> <em>and</em> <code>hmac(nonce, answer)</code>.</p>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="captcha-chain">
+    <div class="captcha-chain four-stage">
       <div class="chain-step">
         <span class="step-bytes">32 bytes</span>
-        <span class="step-name">random</span>
-        <span class="step-detail">crypto.randomBytes(32)</span>
+        <span class="step-name">challenge</span>
+        <span class="step-detail">crypto.randomBytes(32) + nonce</span>
+      </div>
+      <span class="chain-arrow">→</span>
+      <div class="chain-program">
+        <span class="program-label">3-step program</span>
+        <div class="program-step">
+          <span class="program-num">①</span>
+          <span class="program-op">reverse_xor</span>
+          <span class="program-bytes">slice[0..15] ⊕ 0xA3 · 16 B</span>
+        </div>
+        <div class="program-step">
+          <span class="program-num">②</span>
+          <span class="program-op">sum_mod_repeat</span>
+          <span class="program-bytes">Σ [16..31] % 256, ×8 · 8 B</span>
+        </div>
+        <div class="program-step">
+          <span class="program-num">③</span>
+          <span class="program-op">sha256_truncate</span>
+          <span class="program-bytes">sha256[0..31] · first 8 B</span>
+        </div>
       </div>
       <span class="chain-arrow">→</span>
       <div class="chain-step">
-        <span class="step-bytes">16 bytes</span>
-        <span class="step-name">reverse_xor</span>
-        <span class="step-detail">slice[0..15] ⊕ 0xA3, reversed</span>
-      </div>
-      <span class="chain-arrow">→</span>
-      <div class="chain-step">
-        <span class="step-bytes">8 bytes</span>
-        <span class="step-name">sum_mod_repeat</span>
-        <span class="step-detail">Σ slice[16..31] % 256, ×8</span>
-      </div>
-      <span class="chain-arrow">→</span>
-      <div class="chain-step">
-        <span class="step-bytes">8 bytes</span>
-        <span class="step-name">sha256_truncate</span>
-        <span class="step-detail">sha256(all 32) → first 8</span>
+        <span class="step-bytes">hex</span>
+        <span class="step-name">answer</span>
+        <span class="step-detail">sha256(concat(outputs))</span>
       </div>
       <span class="chain-arrow">→</span>
       <div class="chain-step is-final">
-        <span class="step-bytes">hex</span>
+        <span class="step-bytes">proof</span>
         <span class="step-name">hmac(nonce, answer)</span>
-        <span class="step-detail">single-use proof</span>
+        <span class="step-detail">single-use, server-bound</span>
       </div>
     </div>
     `
