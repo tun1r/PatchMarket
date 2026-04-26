@@ -1,95 +1,223 @@
-# PatchMarket Submission Video Scripts
+# PatchMarket Submission Video Scripts — locked
 
-Two locked 60-second scripts for HackNation submission. Demo Video focuses on
-UI/UX and product flow. Tech Video focuses on architecture and stack.
+Two scripts for HackNation submission. Demo video tells the story. Tech
+video explains the architecture. Both target ~90 seconds, both built
+around arrow-key advance through the spectator / architecture decks.
 
-Both are recorded at 1920×1080 60fps via OBS, edited in DaVinci Resolve,
-H.264 MP4 ≤ 30MB, exported as exactly 60s ±0.5s.
+Recorded at 1920×1080×60fps via OBS, edited in DaVinci Resolve, H.264 MP4.
+Voiceover via ElevenLabs ("Adam" or "Daniel") — same voice both videos for
+brand consistency.
 
-Voiceover via ElevenLabs ("Adam" or "Rachel") for both videos. Stick with one
-voice across both for brand consistency.
+---
 
-Background music: Bensound or Pixabay royalty-free, ≤ -18 LUFS so VO sits on
-top.
+## Demo Video — 90 seconds
 
-## Demo Video — 60s
+**Tone:** developer-to-developer, conversational. Opens warm and gets
+sharper. The first 8 seconds are gentle ("we all dread this") to land the
+emotional hook; everything after sharpens to declarative product voice.
 
-Goal: a judge feels they watched two AI agents transact value over Lightning
-and resolve a real bug.
+**Voice direction:** slightly weary opening, then confident.
 
-| s | Visual | Voiceover | On-screen text |
-|---|---|---|---|
-| 0–3 | Black canvas. Type cursor types `PatchMarket` in warm cream on warm off-black. | (silence, beat drop at 2.5s) | `PatchMarket` (large) / `Agents buying verified work over Lightning` (small) |
-| 3–10 | VS Code split: red test in left pane (`fixtures/red-ci/tests/auth.test.mjs`), terminal in right (failing TAP output). Slow zoom on the failing assertion. | "Your coding agent is stuck. CI is red." | none |
-| 10–18 | Hard cut to spectator UI (`?demo=1`). Three agent lanes. Buyer lane streams: `Inspecting red CI` → `Reviewing offers` → `Selecting PatchPro`. Worker lane wakes: `worker.online`. | "So instead of buying more tokens, the agent buys a verified outcome." | none (let the lanes do the work) |
-| 18–30 | `402 Payment Required` card pulses across the hero strip. `WWW-Authenticate: L402 invoiceHash=...` ticker. Agent CAPTCHA gate clears. | "Real L402 challenge. Real Lightning protocol. Real agent CAPTCHA." | none |
-| 30–42 | Verifier lane runs: TAP output streams. `exit 1` flashes terracotta, then `exit 0` flashes sage. Worker lane: `worker.submitted` → `worker.awaiting_release`. | "The verifier runs the actual test in a sandboxed worktree. Real subprocess. Real exit codes." | none |
-| 42–54 | Big `2,800 sats released` fades in (warm amber, 64px tabular). Cut to VS Code git diff: `fixtures/red-ci/src/auth.mjs` actually changed. | "The worker only gets paid when the tests go green. Pay for outcomes, not tokens." | none |
-| 54–60 | Wordmark, tagline, GitHub URL. | (music tail) | `PatchMarket` / `Buy what works.` / `github.com/...` |
+```
+[SLIDE 0: Quota screenshot — 100% used, full-frame, slow zoom into "100% used"]
 
-### Demo Video shot list (record these takes)
+We've all been there: you're deep in the zone, coding with your agent,
+and suddenly—it burns through your quota and stops cold.
 
-1. **Take A — Cold open**: black canvas, cursor types, fades to VS Code red.
-2. **Take B — Spectator showtime**: full `?demo=1` page from page-load through
-   `2,800 sats released`. Aim for a clean ~25s capture.
-3. **Take C — Apply to workspace**: from `released` state, click the apply
-   action, cut to VS Code with git gutter diff visible.
-4. **B-roll — VS Code red→green**: capture just the editor with the test
-   failing, then with the patch applied.
+[NEXT → SLIDE 1: Cover (PatchMarket wordmark + 3 pillars)]
 
-## Tech Video — 60s
+Enter PatchMarket. What if your agent could simply hire someone else's
+agent — one with quota to spare?
 
-Goal: explain how an agent proves it earned the money, in 60 seconds, to a
-technical judge.
+[NEXT → SLIDE 2: CI Failed (bug-line highlighted code panel)]
 
-| s | Visual | Voiceover | On-screen text |
-|---|---|---|---|
-| 0–5 | Question card: warm-cream serif on warm off-black. | "How does an agent prove it earned the money?" | `How does an agent prove it earned the money?` |
-| 5–18 | Animated finite-state-machine diagram of the escrow flow. States light up sequentially as named: `posted → payment_required → paid → captcha_required → claimed → submitted → verified → released`. | "Eight states. Every transition is signed and logged." | (state names appear under each node as they light) |
-| 18–32 | Cut to a `VerificationProof` JSON. Highlights bounce across `repoHash`, `patchHash`, `commandHash`, `beforeLogHash`, `afterLogHash`, `exitCodeBefore: 1`, `exitCodeAfter: 0`, `signature`. | "Every release binds to a hash chain. Repo, patch, command, before and after logs, exit codes." | none (JSON is the visual) |
-| 32–48 | Three-box architecture diagram. Box 1: Buyer (OpenAI tool calls, `gpt-5.1-codex-mini`). Box 2: Server (L402 + escrow FSM + Agent CAPTCHA). Box 3: Worker daemon (`patchpro`). Dashed arrow from Server to Verifier subprocess. Code snippets fade in behind each box. | "The buyer is real GPT tool-calling. The server is L402 escrow. The worker is its own process. The verifier is a real Node subprocess in a temp worktree." | none |
-| 48–60 | Terminal frame showing `npm run showtime` typing, then output streaming. GitHub URL underneath. | "Open source. Runs locally on your laptop in 60 seconds." | `github.com/...` |
+Let's look at a real failing auth test. Instead of burning your budget
+on endless retries, your agent posts a bounded job to our marketplace.
+It shares the exact command that defines a passing grade.
 
-### Tech Video shot list
+[NEXT → SLIDE 3: Bidding (two cards, winner stripe drops on PatchPro)]
 
-1. **Take D — FSM animation**: build in DaVinci with title cards, no
-   recording needed. Use the state list from `src/core.mjs:73-89`.
-2. **Take E — JSON proof**: capture from the spectator UI's proof tab, or
-   pretty-print from `npm run smoke` output. Use a syntax-highlighted code
-   pane.
-3. **Take F — Architecture diagram**: build in DaVinci with three boxes and
-   directional arrows. Pull code snippets from `src/buyer.mjs`,
-   `src/server.mjs`, `bin/patchmarket-worker.mjs`.
-4. **Take G — Showtime terminal**: record `npm run showtime` running cleanly
-   with all three child processes streaming.
+Instantly, worker agents quote the job. Your buyer agent compares price,
+pass rates, and latency, then selects the most efficient worker, PatchPro,
+for the lowest cost to green. Zero human intervention.
 
-## Recording checklist (both videos)
+[NEXT → SLIDE 4: Delegating — SILENT, ~2s, buyer→worker arrow lands]
 
-- [ ] Full-screen recording, do-not-disturb on
-- [ ] Slack, Discord, mail clients quit
-- [ ] Browser zoom at 100% (no UI scaling artifacts)
-- [ ] OBS source: 1920×1080, 60fps, NV12 colorspace
-- [ ] Mic muted, system audio recorded only when wanted
-- [ ] Three takes per scene; pick the cleanest
+[NEXT → SLIDE 5: 402 Payment Required (big amber 402)]
 
-## Editing checklist
+The transaction hits a 402 Payment gate. The buyer proves payment,
 
-- [ ] Voiceover recorded in ElevenLabs first; edit visuals to fit timing
-- [ ] Music ducks under voiceover (-18 LUFS bed, -3 LUFS VO)
-- [ ] All transitions are cuts or 200ms fades; no spinning, no flashy wipes
-- [ ] Final renders at 60s ±0.5s, ≤ 30MB H.264 MP4
-- [ ] Watch at 1× and 0.5× to spot stutters
-- [ ] Color grade: warm-cream text legible on a non-OLED screen at 1×
-- [ ] Export filenames: `assets/submission/demo.mp4`, `assets/submission/tech.mp4`
+[NEXT → SLIDE 6: Agent CAPTCHA (Human ✗ vs Agent ✓ + chain)]
 
-## Submission text (paste into form)
+clears a 30-second agent-only CAPTCHA, and unlocks the job. This is true
+agent-to-agent commerce.
 
-> **PatchMarket** is an L402 escrow protocol where coding agents buy verified
-> red-to-green CI fixes from worker agents and pay over Lightning. Live buyer
-> agent reasons about offers via OpenAI tool-calling, hits a real 402
-> challenge, retries with L402 proof, solves an Agent CAPTCHA, and waits for
-> a real Node subprocess to verify the patch. Only then does escrow release.
-> Built in 36 hours at HackNation 2026.
+[NEXT → SLIDE 7: Patch (typewriter diff)]
+
+The worker operates securely in an isolated sandbox—your repo never leaves
+your machine.
+
+[NEXT → SLIDE 8: Tests Green (exit 1 → exit 0)]
+
+A verifier runs the failing test, applies the patch, and cryptographically
+signs the shift from "exit 1" to "exit 0".
+
+[NEXT → SLIDE 9: Bug Fixed — SILENT, ~2s, resolved diff lands]
+
+[NEXT → SLIDE 10: Sats Released (2,800 sats glow)]
+
+2,800 sats are released over Lightning,
+
+[NEXT → VS CODE CUT: pre-recorded clip of git gutter lighting up
+                     on fixtures/red-ci/src/auth.mjs]
+
+and the verified fix lands directly in your repo, lighting up the diff
+in your editor.
+
+[NEXT → CLOSER: PatchMarket wordmark + GitHub URL]
+
+Stop paying for tokens. Start paying for verified outcomes. PatchMarket:
+the future of agentic commerce.
+```
+
+**Word count:** ~225 words at 150 wpm = ~90 seconds (with the silent quota
+beat at 0:00 and the 2-second silent transitions on Delegating + Bug Fixed).
+
+### Production cues
+
+- **Quota screenshot (0:00):** Music *out*. Single piano note or muted
+  breath. The silence is the held-breath everyone takes when they see
+  this screen for real.
+- **Hard cut at 0:08:** Music drops in *exactly* on the cut to the cover.
+  Don't fade — the camera blinks open.
+- **Mid-sentence cut at "402 → CAPTCHA":** the comma in *"The buyer proves
+  payment, [NEXT] clears a 30-second…"* — practice this; it keeps energy
+  across the slide change.
+- **Mid-sentence cut at "Sats → VS Code":** same trick on the comma after
+  *"2,800 sats are released over Lightning,"*.
+- **VS Code cut:** pre-record this separately. File at red baseline, click
+  Apply To Workspace in the browser, capture the gutter lighting up on
+  line 2. Use SCM side-by-side diff view for the cleanest before/after.
+
+---
+
+## Tech Video — 90 seconds
+
+**Tone:** a friendly architect walking a colleague through the system.
+Confident but conversational — not lecturing. Plain words over jargon.
+Trust the visuals to carry the precise specifics.
+
+**Voice direction:** natural pace, slight pause before the closer.
+
+```
+[SLIDE 1: Cold open — terminal showing npm run showtime + 3 process blocks]
+
+PatchMarket is three processes working together. A buyer agent, a
+marketplace, and a worker agent. One command starts them all.
+
+[NEXT → SLIDE 2: System map (animated SVG, 4 nodes + flow arrows)]
+
+The buyer talks only to the marketplace. The marketplace finds workers,
+handles payment, and runs the test. The worker writes code in its own
+sandbox. No one talks directly to anyone else.
+
+[NEXT → SLIDE 3: Escrow FSM (16-state graph)]
+
+Every job moves through a clear sequence — posted, paid, claimed, verified,
+released. Failures branch off into their own states. The worker earns
+money only from one ending — released.
+
+[NEXT → SLIDE 4: Agent CAPTCHA (code excerpt + 5 rules + transform chain)]
+
+Before claiming a job, the worker has to prove it's an agent. We give it
+32 random bytes and a small puzzle to solve in 30 seconds. Easy for code,
+impossible for a human typing by hand.
+
+[NEXT → SLIDE 5: L402 exchange (HTTP request/response pairs)]
+
+Payment is gated. When the worker tries to claim, the server responds
+with a 402 — like a paywall on the web. The buyer pays, retries, the
+gate opens. This is Lightning's HTTP layer.
+
+[NEXT → SLIDE 6: Verifier subprocess (spawn() code + signed proof JSON)]
+
+Here's the important part. When the worker submits a patch, an independent
+verifier applies it in a sandbox and reruns the failing test. If the test
+passes, the worker gets paid. If it doesn't, no one does.
+
+[NEXT → SLIDE 7: Source + ship (file tree + commands)]
+
+Five thousand lines of code. Zero runtime dependencies. Any buyer
+framework. Any worker model. One open, neutral protocol. Runs entirely
+locally.
+
+[*beat — hold on slide*]
+
+We didn't build another coding assistant. We built the economy for them.
+PatchMarket.
+```
+
+**Word count:** ~225 words at ~150 wpm = ~90 seconds.
+
+### Production cues
+
+- **No music for first 4 seconds.** Let the cold-open terminal type clean.
+- **Music enters under "marketplace" at slide 2.** Sits at -22 LUFS so
+  VO is fully on top.
+- **Slide 6 punchline:** *"If the test passes, the worker gets paid. If
+  it doesn't, no one does."* — slight pace drop, slight emphasis. This
+  is the thesis sentence of the entire video. Don't rush it.
+- **Slide 7 → closer beat:** ~1 second silent pause between *"Runs
+  entirely locally."* and *"We didn't build another coding assistant."*
+  The pause separates the architectural summary from the meta-claim.
+- **Closer hold:** wordmark stays on screen for ~1.5 seconds after the
+  final word. Music tail.
+
+---
+
+## Recording flow (both videos)
+
+**Pre-flight:**
+
+```sh
+PATCHMARKET_WORKER_ENGINE=claude-code npm run showtime
+```
+
+Browser to one of:
+- `http://localhost:3000/?demo=1` (demo deck)
+- `http://localhost:3000/architecture.html` (architecture deck)
+
+F11 for full-screen. F5 to reset. Arrow → at each NEXT marker.
+
+**Recording settings (OBS):**
+- 1920×1080, 60fps
+- NVENC or x264, target ≤30MB final export
+- Display Capture, single monitor
+- Mic muted (record VO separately)
+
+**Editing (DaVinci Resolve):**
+- Drop OBS recording into V1, voiceover into A1, music into A2
+- Trim slide segments to match VO timing
+- Music ducks under VO (-22 LUFS bed, -3 LUFS VO)
+- Cuts only or 200ms fades — no fancy transitions
+- Export H.264, 1080p60, target 60-90s ±0.5s
+
+**Submission:**
+- `assets/submission/demo.mp4`
+- `assets/submission/tech.mp4`
+- Watch each at 1× and 0.5× to spot stutters
+- Reset the fixture before final take if you used Apply
+
+---
+
+## Submission text
+
+> **PatchMarket** is an open protocol where coding agents buy verified
+> red-to-green CI fixes from worker agents and pay over Lightning. A live
+> buyer agent reasons about offers, hits a real 402 challenge, retries
+> with L402 proof, solves an Agent CAPTCHA, and waits for a real Node
+> subprocess to verify the patch. Only then does escrow release. Built in
+> 36 hours at HackNation 2026.
 >
-> Repo: `github.com/...`  •  Demo: `npm run showtime` then open
+> Repo: `github.com/...` • Demo: `npm run showtime` then open
 > `http://localhost:3000/?demo=1`.
