@@ -12,6 +12,7 @@
 // its own event stream into the trace.
 
 import process from "node:process";
+import { generateLivePatch, isEngineAvailable } from "../src/live-worker-engine.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const baseUrl = (args.baseUrl || process.env.PATCHMARKET_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
@@ -22,6 +23,7 @@ const pace = args.pace || "normal";
 const paceMs = pace === "fast" ? { online: 200, claim: 300, patch: 400 } : { online: 600, claim: 800, patch: 1200 };
 const pollMs = args.pollMs || 700;
 const maxIdleMs = args.maxIdleMs || 90_000;
+const engine = args.engine || process.env.PATCHMARKET_WORKER_ENGINE || "deterministic";
 
 let onlineForJobId = null;
 let lastSubmittedJobId = null;
@@ -109,13 +111,53 @@ async function fulfillJob(job) {
   await postEvent(job, {
     type: "worker.patching",
     title: `${workerId} preparing patch`,
-    detail: `Reading allowed scope ${job.fixture.allowedPatchPaths.join(", ")}, generating diff for ${job.fixture.acceptanceCommand}.`,
-    data: { allowedPatchPaths: job.fixture.allowedPatchPaths }
+    detail:
+      engine === "deterministic"
+        ? `Reading allowed scope ${job.fixture.allowedPatchPaths.join(", ")}, using deterministic patch.`
+        : `Reading allowed scope ${job.fixture.allowedPatchPaths.join(", ")}, invoking ${engine}.`,
+    data: { allowedPatchPaths: job.fixture.allowedPatchPaths, engine }
   });
   await sleep(paceMs.patch);
 
-  log(`submitting patch for job ${job.id}`);
-  const submission = await submitPatch(job);
+  let patchOptions = null;
+  if (engine !== "deterministic") {
+    try {
+      const generated = await generateLivePatch({
+        engine,
+        allowedPaths: job.fixture.allowedPatchPaths,
+        failingLog: job.fixture.beforeLog,
+        log
+      });
+      patchOptions = {
+        patch: generated.patch,
+        engine: generated.engine,
+        attempts: generated.attempts,
+        latencyMs: generated.latencyMs,
+        source: "live-engine"
+      };
+      await postEvent(job, {
+        type: "worker.engine_used",
+        title: `${workerId} generated patch via ${engine}`,
+        detail: `${engine} returned a valid unified diff in ${generated.latencyMs}ms (${generated.attempts} attempt${generated.attempts === 1 ? "" : "s"}).`,
+        data: {
+          engine: generated.engine,
+          attempts: generated.attempts,
+          latencyMs: generated.latencyMs
+        }
+      });
+    } catch (error) {
+      log(`engine ${engine} failed: ${error.message} — falling back to deterministic`);
+      await postEvent(job, {
+        type: "worker.engine_fallback",
+        title: `${workerId} engine fallback`,
+        detail: `${engine} failed: ${error.message}. Using deterministic patch.`,
+        data: { engine, attempts: error.attempts || null, error: error.message }
+      });
+    }
+  }
+
+  log(`submitting patch for job ${job.id} (source=${patchOptions ? "live" : "deterministic"})`);
+  const submission = await submitPatch(job, patchOptions);
 
   await postEvent(job, {
     type: "worker.submitted",
@@ -147,14 +189,22 @@ async function postEvent(job, event) {
   }
 }
 
-async function submitPatch(job) {
+async function submitPatch(job, options = null) {
   if (!job.claimCredential) {
     throw new Error("Job has no claim credential yet");
+  }
+  const payload = { claimCredential: job.claimCredential };
+  if (options?.patch) {
+    payload.patch = options.patch;
+    payload.engine = options.engine;
+    payload.attempts = options.attempts;
+    payload.latencyMs = options.latencyMs;
+    payload.source = options.source || "live-engine";
   }
   const response = await fetch(`${baseUrl}/v1/jobs/${job.id}/patch`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ claimCredential: job.claimCredential })
+    body: JSON.stringify(payload)
   });
   const text = await response.text();
   const body = text ? JSON.parse(text) : {};
@@ -182,11 +232,12 @@ function parseArgs(argv) {
     else if (arg === "--pace") parsed.pace = argv[++i];
     else if (arg === "--poll-ms") parsed.pollMs = Number(argv[++i]);
     else if (arg === "--max-idle-ms") parsed.maxIdleMs = Number(argv[++i]);
+    else if (arg === "--engine") parsed.engine = argv[++i];
     else if (arg === "--quiet") parsed.quiet = true;
     else if (arg === "--once") parsed.once = true;
     else if (arg === "--help") {
       console.log(
-        "Usage: patchmarket-worker [--worker-id ID] [--base-url URL] [--pace fast|normal] [--poll-ms N] [--quiet] [--once]"
+        "Usage: patchmarket-worker [--worker-id ID] [--base-url URL] [--pace fast|normal] [--engine deterministic|claude-code|codex|opencode] [--poll-ms N] [--quiet] [--once]"
       );
       process.exit(0);
     } else throw new Error(`Unknown argument: ${arg}`);

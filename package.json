@@ -17,6 +17,7 @@
     "showtime": "node scripts/showtime.mjs",
     "smoke": "node scripts/smoke.mjs",
     "smoke:live": "node scripts/smoke-live.mjs",
+    "smoke:full": "node scripts/smoke-full-live.mjs",
     "test": "node --test test/*.test.mjs"
   }
 }

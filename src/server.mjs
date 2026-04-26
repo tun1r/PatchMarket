@@ -187,7 +187,17 @@ async function handleRequest(req, res) {
 
       if (action === "patch" && req.method === "POST") {
         const body = await readJson(req);
-        const patch = submitPatch(currentJob, body.claimCredential || currentJob.claimCredential);
+        const patch = submitPatch(
+          currentJob,
+          body.claimCredential || currentJob.claimCredential,
+          {
+            patch: typeof body.patch === "string" ? body.patch : undefined,
+            engine: body.engine,
+            attempts: body.attempts,
+            latencyMs: body.latencyMs,
+            source: body.source
+          }
+        );
         return json(res, 200, { patch, job: publicJob(currentJob) });
       }
 

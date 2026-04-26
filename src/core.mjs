@@ -650,7 +650,7 @@ export function issueClaimCredential(job) {
   return job.claimCredential;
 }
 
-export function submitPatch(job, credential = job.claimCredential) {
+export function submitPatch(job, credential = job.claimCredential, options = {}) {
   validateCredential(job, credential);
 
   if (job.state === "claimed") {
@@ -668,7 +668,10 @@ export function submitPatch(job, credential = job.claimCredential) {
     }
   });
 
-  const validation = validatePatch(demoPatch, job.fixture.allowedPatchPaths);
+  const patchText = options.patch || demoPatch;
+  const source = options.patch ? options.source || "live-engine" : "deterministic";
+
+  const validation = validatePatch(patchText, job.fixture.allowedPatchPaths);
   if (!validation.ok) {
     transition(job, "runner_failed", validation.error.message, "verifier");
     throw validation.error;
@@ -677,16 +680,23 @@ export function submitPatch(job, credential = job.claimCredential) {
   job.patchSubmission = {
     jobId: job.id,
     workerId: credential.workerId,
-    patch: demoPatch,
-    patchHash: hashText(demoPatch),
-    submittedAt: new Date().toISOString()
+    patch: patchText,
+    patchHash: hashText(patchText),
+    submittedAt: new Date().toISOString(),
+    source,
+    engine: options.engine || null,
+    attempts: options.attempts || null,
+    latencyMs: options.latencyMs || null
   };
 
   transition(job, "submitted", "Patch submitted with allowed file changes only.", "worker-agent");
   appendEvent(job, {
     type: "patch.submitted",
     title: "Patch submitted",
-    detail: "Patch touches src/auth.mjs only.",
+    detail:
+      source === "deterministic"
+        ? "Deterministic patch. Touches src/auth.mjs only."
+        : `Live patch from ${options.engine || "engine"} (${options.attempts || 1} attempt${options.attempts === 1 ? "" : "s"}, ${options.latencyMs || "?"}ms). Touches src/auth.mjs only.`,
     panel: "proof",
     data: job.patchSubmission
   });

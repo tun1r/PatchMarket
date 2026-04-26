@@ -417,8 +417,11 @@ async function solveCaptcha(runtime) {
 async function requestPatch(runtime) {
   // If a worker daemon is running, wait for it to submit the patch instead
   // of submitting directly. Worker has its own pid and emits worker.* events
-  // that make the "second agent" visible on stage.
-  const workerDeadline = Date.now() + 8000;
+  // that make the "second agent" visible on stage. Live engines (claude-code,
+  // codex, opencode) can take 30–90 seconds to generate, so the wait here is
+  // generous. The worker's own retry/timeout logic decides when to fall back.
+  const waitMs = Number(process.env.PATCHMARKET_BUYER_WORKER_WAIT_MS || 120_000);
+  const workerDeadline = Date.now() + waitMs;
   while (Date.now() < workerDeadline) {
     const polled = await fetchJson(runtime, `/v1/jobs/${runtime.job.id}`);
     runtime.job = polled.job || runtime.job;
