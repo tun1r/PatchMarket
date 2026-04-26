@@ -124,6 +124,62 @@ kbd {
   max-width: 780px;
 }
 
+.subtitle-bullets {
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 16px;
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+  list-style: none;
+  margin: 0 auto;
+  max-width: 820px;
+  padding: 0;
+  text-align: left;
+}
+
+.subtitle-bullets li {
+  align-items: baseline;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 14px 1fr;
+}
+
+.subtitle-bullets li::before {
+  color: var(--accent);
+  content: "→";
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.subtitle-bullets code {
+  background: rgba(212, 161, 85, 0.08);
+  border-radius: 4px;
+  color: var(--accent);
+  display: inline;
+  font-size: 13px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.subtitle-bullets li > * {
+  display: inline;
+}
+
+.subtitle-bullets li {
+  display: block;
+  padding-left: 28px;
+  position: relative;
+}
+
+.subtitle-bullets li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
 .arch-hud {
   align-items: center;
   bottom: 24px;
@@ -255,6 +311,64 @@ kbd {
 .cold-foot strong {
   color: var(--ink);
   font-weight: 500;
+}
+
+/* Slide 1 — three process blocks */
+.cold-blocks {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 4px;
+  max-width: 1120px;
+  width: 100%;
+}
+
+.cold-block {
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 16px 18px;
+  text-align: left;
+}
+
+.cold-block.byr {
+  border-left: 2px solid #c08bd6;
+}
+.cold-block.svr {
+  border-left: 2px solid #6f9fb8;
+}
+.cold-block.wkr {
+  border-left: 2px solid var(--accent);
+}
+
+.cold-block .block-role {
+  color: var(--muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.cold-block .block-name {
+  color: var(--ink-strong);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  margin-top: 6px;
+}
+
+.cold-block .block-file {
+  color: var(--accent);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.cold-block .block-desc {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 10px 0 0;
 }
 
 /* SCENE 02 — System map */
@@ -866,12 +980,12 @@ kbd {
 
 .tree-pane h3,
 .ship-pane h3 {
-  color: var(--muted);
+  color: var(--ink-strong);
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.16em;
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   text-transform: uppercase;
 }
 
@@ -879,10 +993,14 @@ kbd {
   align-items: baseline;
   display: grid;
   font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 13px;
   gap: 14px;
   grid-template-columns: 12px 1fr auto auto;
-  padding: 4px 0;
+  padding: 6px 0;
+}
+
+.tree-row + .tree-row {
+  border-top: 1px solid rgba(244, 237, 230, 0.04);
 }
 
 .tree-row .glyph {
@@ -890,12 +1008,20 @@ kbd {
 }
 
 .tree-row .file {
-  color: var(--ink);
+  color: var(--ink-strong);
+  font-weight: 500;
+}
+
+.tree-row .file .role {
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 12px;
 }
 
 .tree-row .lines {
-  color: var(--muted);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 .tree-row .badge {

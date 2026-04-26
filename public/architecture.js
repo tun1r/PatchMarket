@@ -90,17 +90,38 @@ function buildCold() {
     `
     <span class="eyebrow">cold open · 01 of 07</span>
     <h2 class="title">PatchMarket runs on three processes.</h2>
-    <p class="subtitle">A buyer agent (real OpenAI tool calls), a server (HTTP + L402 + escrow FSM), and a worker daemon (separate PID, polls and patches). The verifier is a real Node subprocess. Run it with one command.</p>
+    <ul class="subtitle-bullets">
+      <li>Buyer side runs real OpenAI tool calls.</li>
+      <li>Worker daemon is a separate PID that spawns Claude Code on demand.</li>
+      <li>Verifier is a real Node subprocess in a temp worktree.</li>
+      <li>One command starts all three.</li>
+    </ul>
+    <div class="cold-blocks">
+      <div class="cold-block byr">
+        <span class="block-role">buyer · pid A</span>
+        <div class="block-name">Buyer agent</div>
+        <div class="block-file">src/buyer.mjs</div>
+        <p class="block-desc">OpenAI Responses API tool calls. Detects red CI, scores offers, drives the protocol.</p>
+      </div>
+      <div class="cold-block svr">
+        <span class="block-role">server · pid B</span>
+        <div class="block-name">PatchMarket server</div>
+        <div class="block-file">src/server.mjs</div>
+        <p class="block-desc">HTTP on :3000. Owns the escrow FSM, gates claim with L402, signs the verifier proof.</p>
+      </div>
+      <div class="cold-block wkr">
+        <span class="block-role">worker · pid C</span>
+        <div class="block-name">PatchPro daemon</div>
+        <div class="block-file">bin/patchmarket-worker.mjs</div>
+        <p class="block-desc">Polls /v1/jobs/current. On claimed, spawns claude --print, submits the diff.</p>
+      </div>
+    </div>
     <div class="term-window">
       <div class="term-head">
         <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
         <span class="term-path">~/patchmarket — bash</span>
       </div>
       <div class="term-body"><span class="term-line"><span class="term-prompt">$</span> <span class="term-cmd">npm run showtime</span></span><span class="term-line"><span class="term-pfx">[showtime]</span> starting PatchMarket showtime</span><span class="term-line"><span class="term-pfx">[showtime]</span> spectator: http://127.0.0.1:3000/?demo=1</span><span class="term-line"><span class="term-pfx svr">[server]</span>   PatchMarket demo running on http://127.0.0.1:3000</span><span class="term-line"><span class="term-pfx wkr">[worker]</span>   patchpro polling http://127.0.0.1:3000 (pid 14021)</span><span class="term-line"><span class="term-pfx byr">[buyer]</span>    inspecting red CI · auth.test.mjs</span><span class="term-line"><span class="term-pfx wkr">[worker]</span>   worker.online → claiming → patching → submitted</span><span class="term-line"><span class="term-pfx svr">[server]</span>   verify.passed · exit 1 → 0 · 2,800 sats released</span></div>
-    </div>
-    <div class="cold-foot">
-      <strong>3 processes</strong>
-      <span>· real subprocess verifier · signed proof over the hash chain</span>
     </div>
     `
   );
@@ -113,7 +134,12 @@ function buildSystem() {
     `
     <span class="eyebrow">system map · 02 of 07</span>
     <h2 class="title">Four components, two trust boundaries.</h2>
-    <p class="subtitle">Buyer never touches the worker process. Worker never touches the verifier subprocess. Server brokers everything; verifier runs in a temp worktree with the network disabled.</p>
+    <ul class="subtitle-bullets">
+      <li>Buyer never touches the worker process.</li>
+      <li>Worker never touches the verifier subprocess.</li>
+      <li>Server brokers everything between them.</li>
+      <li>Verifier runs in a temp worktree with the network disabled.</li>
+    </ul>
     <div class="system-canvas">
       <svg class="system-svg" viewBox="0 0 1280 540" preserveAspectRatio="none">
         <defs>
@@ -265,7 +291,12 @@ function buildFsm() {
     `
     <span class="eyebrow">escrow finite state machine · 03 of 07</span>
     <h2 class="title">16 states, every transition signed.</h2>
-    <p class="subtitle">From <code style="color:var(--accent)">src/core.mjs</code>. Solid amber path is the happy line. Dashed terracotta paths are the failure branches. Worker only earns from <code style="color:#a8c098">released</code>.</p>
+    <ul class="subtitle-bullets">
+      <li>State diagram is real, lifted from <code>src/core.mjs</code>.</li>
+      <li>Solid amber path is the happy line.</li>
+      <li>Dashed terracotta paths are the failure branches.</li>
+      <li>Worker only earns sats from <code>released</code>.</li>
+    </ul>
     <div class="fsm-canvas">${svg}</div>
     <div class="fsm-legend">
       <span><span class="swatch happy"></span>active path</span>
@@ -303,7 +334,12 @@ function buildCaptcha() {
     `
     <span class="eyebrow">agent-only captcha · claim gate · 04 of 07</span>
     <h2 class="title">Agent-only CAPTCHA. NOT for Humans.</h2>
-    <p class="subtitle">Server issues 32 random bytes plus a 3-step byte-transform program. Solver runs the program, concats the outputs, SHA-256s the result for the answer, then HMACs the answer with the server nonce. Single-use, time-bounded, replay-proof. A claim gate, not a humanness or honesty proof.</p>
+    <ul class="subtitle-bullets">
+      <li>Server issues 32 random bytes plus a 3-step byte-transform program.</li>
+      <li>Solver runs the program, concats outputs, SHA-256 hashes for the answer.</li>
+      <li>Final proof: HMAC the answer with the server nonce.</li>
+      <li>Single-use, time-bounded, replay-proof. A claim gate, not a humanness proof.</li>
+    </ul>
 
     <div class="captcha-grid">
       <div class="code-pane">
@@ -398,7 +434,12 @@ function buildL402() {
     `
     <span class="eyebrow">l402 protocol exchange · 05 of 07</span>
     <h2 class="title">A real <code style="color:var(--accent);font-size:0.78em">402 Payment Required</code>.</h2>
-    <p class="subtitle">Worker claim is gated by an HTTP 402 with a <code>WWW-Authenticate: L402</code> header. Buyer retries with a matching <code>Authorization: L402</code> proof. No auth, no claim credential. No claim, no patch.</p>
+    <ul class="subtitle-bullets">
+      <li>Worker claim is gated by an HTTP 402 response.</li>
+      <li>402 carries a <code>WWW-Authenticate: L402</code> header with invoice + amount.</li>
+      <li>Buyer retries with a matching <code>Authorization: L402</code> proof.</li>
+      <li>No auth → no claim credential → no patch.</li>
+    </ul>
     <div class="exchange">
       <div class="xchg-pair">
         <div class="xchg-card">
@@ -509,7 +550,12 @@ function buildVerifier() {
     `
     <span class="eyebrow">verifier subprocess · 06 of 07</span>
     <h2 class="title">Real <code style="color:#c08bd6;font-size:0.78em">spawn()</code>. Real exit code. Signed proof.</h2>
-    <p class="subtitle">The worker doesn't get paid for handing in a diff. It gets paid for making the pinned acceptance command return exit 0 in a fresh temp worktree. Every release is bound to seven hashes.</p>
+    <ul class="subtitle-bullets">
+      <li>Worker doesn't get paid for handing in a diff.</li>
+      <li>Worker gets paid only when <code>node --test</code> returns exit 0.</li>
+      <li>Subprocess runs in a fresh temp worktree, network disabled.</li>
+      <li>Every release binds to seven HMAC-signed hashes.</li>
+    </ul>
     <div class="verify-grid">
       <div class="code-pane">
         <div class="pane-head"><span class="accent">src/verifier.mjs</span><span>spawn() · runAcceptance()</span></div>
@@ -551,7 +597,12 @@ function buildSource() {
     `
     <span class="eyebrow">source + ship · 07 of 07</span>
     <h2 class="title">Runs locally. <code style="color:var(--accent);font-size:0.78em">npm run showtime</code>.</h2>
-    <p class="subtitle">Zero runtime dependencies in the protocol path. Node 20+, OpenAI Responses API for the buyer (with scripted fallback), simulated L402, real Node subprocess for verification.</p>
+    <ul class="subtitle-bullets">
+      <li>Zero runtime dependencies in the protocol path.</li>
+      <li>Node 20+ host. OpenAI Responses API on the buyer side, Claude Code CLI on the worker side.</li>
+      <li>Simulated L402 settlement. Real Node subprocess for verification.</li>
+      <li>Three smokes:  <code>npm run smoke</code> · <code>smoke:live</code> · <code>smoke:full</code>.</li>
+    </ul>
     <div class="source-grid">
       <div class="tree-pane">
         <h3>repo · 4,786 lines · 7 tests · 0 deps</h3>
