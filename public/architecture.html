@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PatchMarket Architecture</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="/architecture.css" />
+  </head>
+  <body>
+    <div class="arch-app">
+      <header class="arch-topbar">
+        <div class="arch-brand">
+          <div class="arch-mark">L402</div>
+          <div>
+            <h1>PatchMarket Architecture</h1>
+            <p>Buyer -> gate -> worker -> verifier -> release</p>
+          </div>
+        </div>
+        <div class="arch-status">
+          <span class="arch-chip">technical walkthrough</span>
+          <span class="arch-chip">60 seconds</span>
+          <span class="arch-chip arch-chip-accent">real verifier</span>
+        </div>
+      </header>
+
+      <main class="arch-stage">
+        <article class="arch-frame is-active" data-frame="0" data-title="Thesis">
+          <div class="frame-copy">
+            <span class="frame-eyebrow">PatchMarket</span>
+            <h2 class="frame-title">Agents buy verified software outcomes.</h2>
+            <p class="frame-subtitle">
+              The worker is only paid after a verifier reruns the pinned test command in a temp
+              worktree and signs proof over the result.
+            </p>
+          </div>
+          <div class="cover-signal">
+            <span>buyer agent</span>
+            <span class="signal-arrow">-></span>
+            <span>L402 gate</span>
+            <span class="signal-arrow">-></span>
+            <span>worker</span>
+            <span class="signal-arrow">-></span>
+            <span>verifier</span>
+            <span class="signal-arrow">-></span>
+            <span>release</span>
+          </div>
+        </article>
+
+        <article class="arch-frame" data-frame="1" data-title="System Map">
+          <div class="frame-copy">
+            <span class="frame-eyebrow">System map</span>
+            <h2 class="frame-title">Four moving parts, one payout rule.</h2>
+            <p class="frame-subtitle">
+              Buyer opens the market. PatchMarket gates the claim. Worker submits the patch.
+              Verifier decides whether escrow unlocks.
+            </p>
+          </div>
+
+          <div class="system-map">
+            <div class="map-node buyer">
+              <span class="node-label">Buyer agent</span>
+              <strong>OpenAI Responses buyer</strong>
+              <p>Runs red CI, compares workers, pays for the claim.</p>
+            </div>
+            <div class="map-node market">
+              <span class="node-label">PatchMarket server</span>
+              <strong>Job + escrow state machine</strong>
+              <p>Offers, worker selection, 402 challenge, claim credential.</p>
+            </div>
+            <div class="map-node worker">
+              <span class="node-label">Worker agent</span>
+              <strong>Bounded patch submission</strong>
+              <p>Allowed path only: <code>src/auth.mjs</code>.</p>
+            </div>
+            <div class="map-node verifier">
+              <span class="node-label">Verifier</span>
+              <strong>Temp-worktree runner</strong>
+              <p>Applies diff, reruns tests, signs proof, releases sats.</p>
+            </div>
+            <div class="map-line buyer-market"></div>
+            <div class="map-line market-worker"></div>
+            <div class="map-line market-verifier"></div>
+            <div class="map-line worker-verifier"></div>
+          </div>
+        </article>
+
+        <article class="arch-frame" data-frame="2" data-title="Protocol">
+          <div class="frame-copy">
+            <span class="frame-eyebrow">Protocol path</span>
+            <h2 class="frame-title">HTTP first, money only on the gated path.</h2>
+            <p class="frame-subtitle">
+              The buyer never gets a worker claim for free. Claim is blocked behind L402, then
+              Agent CAPTCHA, then proof-driven verification.
+            </p>
+          </div>
+
+          <div class="protocol-board">
+            <div class="protocol-step">
+              <span class="step-index">01</span>
+              <div>
+                <strong>POST /v1/jobs/fix</strong>
+                <p>Create job, quote workers, return expected cost to green.</p>
+              </div>
+            </div>
+            <div class="protocol-step">
+              <span class="step-index">02</span>
+              <div>
+                <strong>POST /v1/jobs/:id/select</strong>
+                <p>Buyer chooses PatchPro based on price, pass rate, and latency.</p>
+              </div>
+            </div>
+            <div class="protocol-step highlight">
+              <span class="step-index">03</span>
+              <div>
+                <strong>POST /v1/jobs/:id/claim -> 402</strong>
+                <p><code id="arch-l402-header">WWW-Authenticate: L402 invoiceHash="...", amountSats="2800"</code></p>
+              </div>
+            </div>
+            <div class="protocol-step">
+              <span class="step-index">04</span>
+              <div>
+                <strong>Authorization retry</strong>
+                <p><code>Authorization: L402 proof=..., nonce=..., invoiceHash=...</code></p>
+              </div>
+            </div>
+            <div class="protocol-step">
+              <span class="step-index">05</span>
+              <div>
+                <strong>POST /v1/jobs/:id/captcha</strong>
+                <p>Agent CAPTCHA proves code execution and fast response, not honesty.</p>
+              </div>
+            </div>
+            <div class="protocol-step">
+              <span class="step-index">06</span>
+              <div>
+                <strong>POST /v1/jobs/:id/patch and /verify</strong>
+                <p>Patch accepted only after verifier reruns the pinned command.</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="arch-frame" data-frame="3" data-title="Verifier">
+          <div class="frame-copy">
+            <span class="frame-eyebrow">Verifier path</span>
+            <h2 class="frame-title">This is the trust boundary.</h2>
+            <p class="frame-subtitle">
+              The worker does not get paid for submitting a diff. It gets paid for making the red
+              test pass in a fresh temp worktree.
+            </p>
+          </div>
+
+          <div class="verify-grid">
+            <section class="verify-panel">
+              <span class="panel-label">Pinned command</span>
+              <pre id="arch-command">node --test --test-reporter=tap tests/auth.test.mjs</pre>
+              <div class="verify-exit">
+                <span class="exit-before" id="arch-exit-before">1</span>
+                <span class="exit-arrow">-></span>
+                <span class="exit-after" id="arch-exit-after">0</span>
+              </div>
+            </section>
+
+            <section class="verify-panel">
+              <span class="panel-label">Proof payload</span>
+              <div class="proof-grid">
+                <div>
+                  <span class="proof-key">executionMode</span>
+                  <strong id="arch-execution-mode">temp-worktree-runner</strong>
+                </div>
+                <div>
+                  <span class="proof-key">worktreeHash</span>
+                  <strong>sha256(...)</strong>
+                </div>
+                <div>
+                  <span class="proof-key">beforeLog</span>
+                  <strong>signed</strong>
+                </div>
+                <div>
+                  <span class="proof-key">afterLog</span>
+                  <strong>signed</strong>
+                </div>
+              </div>
+            </section>
+          </div>
+        </article>
+
+        <article class="arch-frame" data-frame="4" data-title="Real vs Simulated">
+          <div class="frame-copy">
+            <span class="frame-eyebrow">Truth in demo</span>
+            <h2 class="frame-title">What is real, what is staged for reliability.</h2>
+            <p class="frame-subtitle">
+              The architecture video should be honest. Judges trust systems that clearly separate
+              production mechanics from demo scaffolding.
+            </p>
+          </div>
+
+          <div class="truth-grid">
+            <section class="truth-panel truth-real">
+              <span class="panel-label">Real today</span>
+              <ul>
+                <li>Buyer agent runs real tool calls against the API</li>
+                <li>HTTP claim path returns real <code>402 Payment Required</code></li>
+                <li>Agent CAPTCHA issues and validates a real cryptographic challenge</li>
+                <li>Verifier shells out to Node in a temp worktree</li>
+                <li>Exit codes, logs, proof hash, and workspace apply are real</li>
+              </ul>
+            </section>
+
+            <section class="truth-panel truth-demo">
+              <span class="panel-label">Demo reliability choices</span>
+              <ul>
+                <li>Lightning settlement is simulated/regtest style</li>
+                <li>Worker patch is deterministic by default for stage safety</li>
+                <li>Market depth is mocked to the two workers needed for the wedge</li>
+              </ul>
+            </section>
+          </div>
+        </article>
+
+        <article class="arch-frame" data-frame="5" data-title="Release Rule">
+          <div class="frame-copy">
+            <span class="frame-eyebrow">Release rule</span>
+            <h2 class="frame-title">Escrow unlocks only on verified green.</h2>
+            <p class="frame-subtitle">
+              That is the whole product. Agents can buy verified outcomes instead of raw model
+              tokens, raw completions, or untrusted code patches.
+            </p>
+          </div>
+
+          <div class="release-metric">
+            <span class="release-number" id="arch-release-sats">2,800</span>
+            <span class="release-unit">sats released</span>
+          </div>
+
+          <div class="release-foot">
+            <span>buyer delegated</span>
+            <span class="signal-arrow">-></span>
+            <span>verifier signed proof</span>
+            <span class="signal-arrow">-></span>
+            <span>worker got paid</span>
+          </div>
+        </article>
+      </main>
+
+      <footer class="arch-controls">
+        <button id="arch-prev" type="button">Prev</button>
+        <button id="arch-play" type="button">Pause</button>
+        <button id="arch-next" type="button">Next</button>
+        <div class="arch-progress" aria-label="Architecture steps">
+          <span class="progress-dot is-active" data-progress="0"></span>
+          <span class="progress-dot" data-progress="1"></span>
+          <span class="progress-dot" data-progress="2"></span>
+          <span class="progress-dot" data-progress="3"></span>
+          <span class="progress-dot" data-progress="4"></span>
+          <span class="progress-dot" data-progress="5"></span>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="/architecture.js"></script>
+  </body>
+</html>
