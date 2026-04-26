@@ -15,3 +15,5 @@ assets/recordings/
 assets/submission/
 .env
 .env.local
+JUDGE_SCRIPT.md
+AGENTS.md

@@ -206,7 +206,6 @@ public/scene-stage.css         Vercel-grade scene styling
 public/architecture.html       7-slide architecture deck (?architecture)
 test/*.test.mjs                14 unit tests
 docs/VIDEO_SCRIPTS.md          locked submission video scripts
-JUDGE_SCRIPT.md                stage runbook
 ```
 
 About 5,000 lines of Node total. Zero runtime dependencies in the protocol path. Any agent framework on the buyer side, any agent on the worker side — they just have to speak the protocol.
