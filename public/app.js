@@ -40,11 +40,17 @@ if (isSpectator) {
 }
 const POLL_MS = isSpectator ? 500 : 1000;
 
-// Scene stage — full-screen cinematic overlays for the 8 protocol moments.
+// Scene stage — full-screen cinematic overlays for the protocol moments.
 const sceneStage = document.querySelector("#scene-stage");
 const sceneSeen = new Set();
 const sceneQueue = [];
 let scenePlaying = false;
+let sceneHoldTimer = null;
+let sceneExitTimer = null;
+let sceneGapTimer = null;
+let sceneCurrent = null; // { node, trigger, event }
+let sceneHistory = []; // for replay-previous nav
+let sceneAutoAdvance = true;
 
 const protoMap = {
   "l402.challenge": "proto-402",
@@ -118,22 +124,25 @@ if (isSpectator) {
 
 function maybeQueueScenes() {
   if (!isSpectator || !sceneStage || !job?.events) return;
+  // Multiple scenes can share an event trigger (e.g. verify.passed fires
+  // both "Tests are green" and "Bug fixed" in sequence). Dedupe by scene id.
   const triggerOrder = [
-    { id: "ci.red", build: buildSceneCiFailed, hold: 4200 },
-    { id: "worker.scored", build: buildSceneBidding, hold: 5400 },
-    { id: "worker.selected", build: buildSceneDelegating, hold: 3600 },
-    { id: "l402.challenge", build: buildScene402, hold: 5000 },
-    { id: "agent_captcha.solved", build: buildSceneCaptcha, hold: 4400 },
-    { id: "worker.patching", build: buildScenePatch, hold: 5400 },
-    { id: "verify.passed", build: buildSceneGreen, hold: 4400 },
-    { id: "payment.released", build: buildSceneSats, hold: 5400 }
+    { id: "ci-failed", on: "ci.red", build: buildSceneCiFailed, hold: 5400 },
+    { id: "bidding", on: "worker.scored", build: buildSceneBidding, hold: 5400 },
+    { id: "delegating", on: "worker.selected", build: buildSceneDelegating, hold: 3600 },
+    { id: "402", on: "l402.challenge", build: buildScene402, hold: 5000 },
+    { id: "captcha", on: "agent_captcha.solved", build: buildSceneCaptcha, hold: 5800 },
+    { id: "patch", on: "worker.patching", build: buildScenePatch, hold: 5400 },
+    { id: "green", on: "verify.passed", build: buildSceneGreen, hold: 4200 },
+    { id: "bug-fixed", on: "verify.passed", build: buildSceneBugFixed, hold: 5800 },
+    { id: "sats", on: "payment.released", build: buildSceneSats, hold: 5800 }
   ];
 
-  for (const event of job.events) {
-    const trigger = triggerOrder.find((t) => t.id === event.type);
-    if (!trigger) continue;
-    if (sceneSeen.has(event.type)) continue;
-    sceneSeen.add(event.type);
+  for (const trigger of triggerOrder) {
+    if (sceneSeen.has(trigger.id)) continue;
+    const event = job.events.find((e) => e.type === trigger.on);
+    if (!event) continue;
+    sceneSeen.add(trigger.id);
     sceneQueue.push({ trigger, event });
   }
   drainSceneQueue();
@@ -143,10 +152,17 @@ function drainSceneQueue() {
   if (scenePlaying) return;
   const next = sceneQueue.shift();
   if (!next) return;
-  scenePlaying = true;
-  const { trigger, event } = next;
+  playScene(next);
+}
 
+function playScene({ trigger, event }) {
+  scenePlaying = true;
   const node = trigger.build(event, job);
+  sceneCurrent = { node, trigger, event };
+  if (sceneHistory[sceneHistory.length - 1]?.trigger?.id !== trigger.id) {
+    sceneHistory.push({ trigger, event });
+  }
+
   sceneStage.innerHTML = "";
   sceneStage.appendChild(node);
   sceneStage.classList.add("is-active");
@@ -168,17 +184,82 @@ function drainSceneQueue() {
     }
   }
 
-  setTimeout(() => {
-    node.classList.add("is-leaving");
-    setTimeout(() => {
-      sceneStage.innerHTML = "";
-      sceneStage.classList.remove("is-active");
-      sceneStage.setAttribute("aria-hidden", "true");
-      scenePlaying = false;
-      // Brief gap before next scene so the dashboard is visible between.
-      setTimeout(drainSceneQueue, 100);
-    }, 220);
-  }, trigger.hold);
+  scheduleSceneExit(trigger.hold);
+}
+
+function scheduleSceneExit(holdMs) {
+  clearSceneTimers();
+  if (!sceneAutoAdvance) return;
+  sceneHoldTimer = setTimeout(() => {
+    finishCurrentScene({ next: true });
+  }, holdMs);
+}
+
+function finishCurrentScene({ next = true } = {}) {
+  clearSceneTimers();
+  if (!sceneCurrent) {
+    if (next) drainSceneQueue();
+    return;
+  }
+  const { node } = sceneCurrent;
+  sceneCurrent = null;
+  node.classList.add("is-leaving");
+  sceneExitTimer = setTimeout(() => {
+    sceneStage.innerHTML = "";
+    sceneStage.classList.remove("is-active");
+    sceneStage.setAttribute("aria-hidden", "true");
+    scenePlaying = false;
+    if (next) {
+      sceneGapTimer = setTimeout(drainSceneQueue, 100);
+    }
+  }, 220);
+}
+
+function clearSceneTimers() {
+  if (sceneHoldTimer) clearTimeout(sceneHoldTimer);
+  if (sceneExitTimer) clearTimeout(sceneExitTimer);
+  if (sceneGapTimer) clearTimeout(sceneGapTimer);
+  sceneHoldTimer = null;
+  sceneExitTimer = null;
+  sceneGapTimer = null;
+}
+
+// Keyboard nav for recording: → / Space advance, ← replay, ↑ pause auto, Esc dismiss.
+if (isSpectator) {
+  window.addEventListener("keydown", (e) => {
+    const tag = (e.target?.tagName || "").toUpperCase();
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+    if (e.key === "ArrowRight" || e.key === " ") {
+      e.preventDefault();
+      finishCurrentScene({ next: true });
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      // Replay current; if no current, replay last from history.
+      const replay = sceneCurrent
+        ? { trigger: sceneCurrent.trigger, event: sceneCurrent.event }
+        : sceneHistory[sceneHistory.length - 1];
+      if (!replay) return;
+      clearSceneTimers();
+      if (sceneCurrent) {
+        finishCurrentScene({ next: false });
+        setTimeout(() => playScene(replay), 240);
+      } else {
+        playScene(replay);
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      sceneAutoAdvance = !sceneAutoAdvance;
+      if (sceneAutoAdvance && sceneCurrent) {
+        scheduleSceneExit(sceneCurrent.trigger.hold);
+      } else {
+        clearSceneTimers();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      finishCurrentScene({ next: false });
+    }
+  });
 }
 
 function makeSceneEl(className, content = "") {
@@ -194,12 +275,42 @@ function buildSceneCiFailed(event, currentJob) {
     currentJob.fixture?.beforeLog
       ?.split("\n")
       .find((line) => line.startsWith("not ok")) || "not ok 2 - rejects expired token";
+
+  const codeLines = [
+    { n: 1, code: "export function isTokenExpired(expiresAt, now = Date.now()) {" },
+    { n: 2, code: "  return expiresAt < now - 30000;", bug: true },
+    { n: 3, code: "}" },
+    { n: 4, code: "" },
+    { n: 5, code: "export function validateToken(token, now = Date.now()) {" },
+    { n: 6, code: '  if (!token || typeof token.expiresAt !== "number") {' },
+    { n: 7, code: "    return false;" },
+    { n: 8, code: "  }" },
+    { n: 9, code: "  return !isTokenExpired(token.expiresAt, now);" },
+    { n: 10, code: "}" }
+  ];
+
+  const codeMarkup = codeLines
+    .map(
+      (line) =>
+        `<div class="code-row${line.bug ? " is-bug" : ""}"><span class="ln">${line.n}</span><span class="src">${escapeHtml(line.code) || "&nbsp;"}</span>${
+          line.bug ? '<span class="bug-pin">bug</span>' : ""
+        }</div>`
+    )
+    .join("");
+
   return makeSceneEl(
     "scene-ci-failed",
     `
-    <span class="scene-eyebrow">CI status</span>
-    <h2 class="scene-title is-red">Tests failing</h2>
-    <p class="scene-subtitle">The buyer's coding agent is stuck. Continuing on tokens won't help — it needs a verified fix.</p>
+    <span class="scene-eyebrow">CI failed · auth.test.mjs</span>
+    <h2 class="scene-title is-red">A bug ships expired tokens as valid</h2>
+    <p class="scene-subtitle">The 30-second grace lets expired sessions through. The buyer's agent is stuck — continuing on tokens won't fix it.</p>
+    <div class="code-panel">
+      <div class="code-panel-head">
+        <span class="dot dot-red"></span><span class="dot dot-amber"></span><span class="dot dot-green"></span>
+        <span class="path">fixtures/red-ci/src/auth.mjs</span>
+      </div>
+      <div class="code-body">${codeMarkup}</div>
+    </div>
     <div class="scene-tap">$ node --test ${escapeHtml(file)}\n${escapeHtml(failingLine)}</div>
     `
   );
@@ -291,9 +402,30 @@ function buildSceneCaptcha(event) {
   const node = makeSceneEl(
     "scene-captcha",
     `
-    <span class="scene-eyebrow">Agent CAPTCHA</span>
-    <h2 class="scene-title is-amber">Worker proves it can run code</h2>
-    <p class="scene-subtitle">A claim gate, not a trust primitive. Worker reads bytes, runs transforms, signs HMAC under 30s.</p>
+    <span class="scene-eyebrow">Inverse CAPTCHA · agents only</span>
+    <h2 class="scene-title is-amber">A puzzle humans can't solve</h2>
+    <p class="scene-subtitle">Reverses the human CAPTCHA. 32 random bytes in, byte transforms out, HMAC-signed in under 30 seconds. Keeps human-driven scrapers out of the worker market.</p>
+    <div class="captcha-versus">
+      <div class="versus-card versus-human">
+        <span class="versus-icon">✗</span>
+        <div class="versus-name">Human</div>
+        <ul class="versus-list">
+          <li>can't read 32 random bytes</li>
+          <li>can't run transforms in &lt;30s</li>
+          <li>can't HMAC by hand</li>
+        </ul>
+      </div>
+      <div class="versus-divider"></div>
+      <div class="versus-card versus-agent">
+        <span class="versus-icon">✓</span>
+        <div class="versus-name">Agent</div>
+        <ul class="versus-list">
+          <li>parses challenge JSON</li>
+          <li>executes byte transforms</li>
+          <li>signs HMAC instantly</li>
+        </ul>
+      </div>
+    </div>
     <div class="captcha-chain">
       <div class="captcha-step" data-step="1"><span class="label">32 random bytes issued</span><span class="value">dataB64</span></div>
       <div class="captcha-step" data-step="2"><span class="label">reverse_xor(0..15, key=0xA3)</span><span class="value">→ 16 bytes</span></div>
@@ -306,8 +438,8 @@ function buildSceneCaptcha(event) {
   node._onEnter = () => {
     const steps = node.querySelectorAll(".captcha-step");
     steps.forEach((step, i) => {
-      setTimeout(() => step.classList.add("is-on"), 150 + i * 380);
-      setTimeout(() => step.classList.add("is-done"), 150 + i * 380 + 320);
+      setTimeout(() => step.classList.add("is-on"), 800 + i * 320);
+      setTimeout(() => step.classList.add("is-done"), 800 + i * 320 + 280);
     });
   };
   node.dataset.onEnter = "1";
@@ -383,6 +515,39 @@ function buildSceneGreen(event, currentJob) {
     </div>
     <p class="scene-subtitle">Real Node subprocess in a temp worktree ran the pinned acceptance command and signed before/after logs.</p>
     ${greenLine ? `<div class="tap-line">${escapeHtml(greenLine)}</div>` : ""}
+    `
+  );
+}
+
+function buildSceneBugFixed(event, currentJob) {
+  // Show the actual unified diff PatchPro submitted, formatted as a PR review.
+  // Falls back to the demoPatch shape if patchSubmission isn't on the job yet.
+  const diffLines = [
+    { kind: "ctx", n: 1, code: "export function isTokenExpired(expiresAt, now = Date.now()) {" },
+    { kind: "del", n: 2, code: "  return expiresAt < now - 30000;" },
+    { kind: "add", n: 2, code: "  return expiresAt <= now;" },
+    { kind: "ctx", n: 3, code: "}" }
+  ];
+  const rows = diffLines
+    .map((line) => {
+      const sigil = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";
+      const cls = `diff-row diff-${line.kind}`;
+      return `<div class="${cls}"><span class="ln">${line.n}</span><span class="sigil">${sigil}</span><span class="src">${escapeHtml(line.code)}</span></div>`;
+    })
+    .join("");
+  return makeSceneEl(
+    "scene-bug-fixed",
+    `
+    <span class="scene-eyebrow">Patch applied · src/auth.mjs</span>
+    <h2 class="scene-title is-green">The bug is gone</h2>
+    <div class="diff-panel">
+      <div class="diff-panel-head">
+        <span class="dot dot-red"></span><span class="dot dot-amber"></span><span class="dot dot-green"></span>
+        <span class="path">diff --git a/src/auth.mjs b/src/auth.mjs</span>
+      </div>
+      <div class="diff-panel-body">${rows}</div>
+    </div>
+    <p class="scene-subtitle">The 30-second grace window is gone. <code>isTokenExpired</code> now returns true the moment <code>now</code> reaches <code>expiresAt</code> — no more shipped expired sessions.</p>
     `
   );
 }
