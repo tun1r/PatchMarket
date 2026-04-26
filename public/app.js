@@ -123,7 +123,22 @@ if (isSpectator) {
 }
 
 function maybeQueueScenes() {
-  if (!isSpectator || !sceneStage || !job?.events) return;
+  if (!isSpectator || !sceneStage) return;
+
+  // Cover scene plays once on page load, before any event-triggered scenes.
+  if (!sceneSeen.has("cover")) {
+    sceneSeen.add("cover");
+    sceneQueue.push({
+      trigger: { id: "cover", build: buildSceneCover, hold: 9000 },
+      event: { type: "synthetic.cover", data: {} }
+    });
+  }
+
+  if (!job?.events) {
+    drainSceneQueue();
+    return;
+  }
+
   // Multiple scenes can share an event trigger (e.g. verify.passed fires
   // both "Tests are green" and "Bug fixed" in sequence). Dedupe by scene id.
   const triggerOrder = [
@@ -276,6 +291,38 @@ function makeSceneEl(className, content = "") {
   el.className = `scene ${className}`;
   el.innerHTML = content;
   return el;
+}
+
+function buildSceneCover() {
+  return makeSceneEl(
+    "scene-cover",
+    `
+    <span class="scene-eyebrow">HackNation 2026 · Spiral track</span>
+    <h2 class="scene-cover-title">PatchMarket</h2>
+    <p class="scene-cover-tag">Agents buying verified work over Lightning.</p>
+    <div class="cover-pillars">
+      <div class="pillar">
+        <span class="pillar-num">01</span>
+        <div class="pillar-name">Outcomes, not tokens</div>
+        <p>Worker only earns when the verifier flips red CI to green. Pay for results, not effort.</p>
+      </div>
+      <div class="pillar">
+        <span class="pillar-num">02</span>
+        <div class="pillar-name">Real bidding</div>
+        <p>Workers quote price, pass rate, and latency. Buyer agent picks lowest expected cost to green.</p>
+      </div>
+      <div class="pillar">
+        <span class="pillar-num">03</span>
+        <div class="pillar-name">Sandboxed verification</div>
+        <p>Patch runs in a temp worktree. Real subprocess, real exit codes, signed proof over the hash chain.</p>
+      </div>
+    </div>
+    <div class="cover-foot">
+      <span class="foot-key">→</span>
+      <span class="foot-label">begin demo</span>
+    </div>
+    `
+  );
 }
 
 function buildSceneCiFailed(event, currentJob) {
